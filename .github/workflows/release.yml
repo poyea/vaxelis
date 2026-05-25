@@ -1,0 +1,27 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release-artifacts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build g++
+      - name: Configure release build
+        run: cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPP_PACKAGE_BOILERPLATE_BUILD_TESTS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=OFF
+      - name: Build release artifacts
+        run: cmake --build build/release --parallel
+      - name: Package artifacts
+        run: tar -czf cpp-package-boilerplate-${GITHUB_REF_NAME}.tar.gz -C build/release .
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: cpp-package-boilerplate-${{ github.ref_name }}.tar.gz
