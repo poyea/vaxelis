@@ -9,7 +9,10 @@ add_library(vaxelis_engine STATIC
     rhi/gl/GLDevice.cpp
     rhi/vk/VkDevice.cpp
     renderer/SpriteRenderer.cpp
+    scene/Scene.cpp
+    scene/SceneSerializer.cpp
     debug/ImGuiLayer.cpp
+    debug/SceneInspector.cpp
 )
 
 target_include_directories(vaxelis_engine PUBLIC ${CMAKE_SOURCE_DIR})
@@ -20,9 +23,11 @@ target_link_libraries(vaxelis_engine
         glm::glm
         spdlog::spdlog
         imgui   # transitively used by debug overlay code in clients
+        entt    # public — components live in headers clients include
     PRIVATE
         stb
         miniaudio
+        nlohmann_json
 )
 
 if(WIN32)

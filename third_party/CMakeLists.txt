@@ -24,6 +24,14 @@ target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
 add_library(miniaudio INTERFACE)
 target_include_directories(miniaudio INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/miniaudio)
 
+# --- entt (header-only, single-include) ---
+add_library(entt INTERFACE)
+target_include_directories(entt INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/entt/single_include)
+
+# --- nlohmann/json (header-only, single-include) ---
+add_library(nlohmann_json INTERFACE)
+target_include_directories(nlohmann_json INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/json/single_include)
+
 # --- Dear ImGui (no shipped CMakeLists). Build core + SDL3/OpenGL3 backends. ---
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
 add_library(imgui STATIC

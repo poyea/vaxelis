@@ -1,0 +1,58 @@
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include <entt/entt.hpp>
+
+#include "engine/math/Math.hpp"
+#include "engine/rhi/Rhi.hpp"
+
+namespace vaxelis {
+
+// Identifier. Default-constructed entities get "Node" so the inspector tree
+// never shows a blank row.
+struct Name {
+    std::string value{"Node"};
+};
+
+// Scene-graph link. Roots have `parent == entt::null`. Children list is kept
+// in insertion order; reordering is a UX concern, not stored here.
+struct Hierarchy {
+    entt::entity parent{entt::null};
+    std::vector<entt::entity> children;
+};
+
+// 2D transform. Local space relative to parent.
+struct Transform2D {
+    vec2  position{0.0f, 0.0f};
+    float rotation{0.0f};            // radians
+    vec2  scale{1.0f, 1.0f};
+
+    mat4 local_matrix() const {
+        // T * R * S, 2D in XY plane.
+        const float c = std::cos(rotation);
+        const float s = std::sin(rotation);
+        mat4 m(1.0f);
+        m[0] = vec4( c * scale.x,  s * scale.x, 0.0f, 0.0f);
+        m[1] = vec4(-s * scale.y,  c * scale.y, 0.0f, 0.0f);
+        m[2] = vec4( 0.0f,         0.0f,        1.0f, 0.0f);
+        m[3] = vec4(position,      0.0f,        1.0f);
+        return m;
+    }
+};
+
+// Renderable sprite. `texture_key` is a string ID the host resolves against
+// its asset table — keeps serialization texture-agnostic. `texture` is the
+// runtime-resolved handle, not serialized.
+struct SpriteComponent {
+    std::string         texture_key;
+    rhi::TextureHandle  texture{};
+    vec2                size{32.0f, 32.0f};
+    vec4                uv_rect{0.0f, 0.0f, 1.0f, 1.0f};
+    vec4                color{1.0f, 1.0f, 1.0f, 1.0f};
+    int                 z_order{0};
+    bool                visible{true};
+};
+
+}  // namespace vaxelis

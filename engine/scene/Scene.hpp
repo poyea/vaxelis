@@ -1,0 +1,57 @@
+#pragma once
+
+#include <functional>
+#include <string>
+#include <string_view>
+
+#include <entt/entt.hpp>
+
+#include "engine/math/Math.hpp"
+#include "engine/scene/Components.hpp"
+
+namespace vaxelis {
+
+class SpriteBatch;
+
+// Scene = entt::registry + an implicit root entity that holds the top-level
+// nodes. Hierarchy edits go through the helpers below so parent/child stay in
+// sync; touching the registry directly skips those invariants.
+class Scene {
+public:
+    Scene();
+
+    entt::registry&       registry()       { return registry_; }
+    const entt::registry& registry() const { return registry_; }
+    entt::entity          root() const     { return root_; }
+
+    // Creates a node with a Name + Hierarchy + Transform2D. Parent defaults
+    // to root. Caller adds extra components via registry().emplace<>.
+    entt::entity create_node(std::string name, entt::entity parent = entt::null);
+
+    // Destroys `e` and all descendants. Removes the entry from the parent's
+    // child list. No-op if `e` is null or already destroyed.
+    void destroy_node(entt::entity e);
+
+    // Reparents `e` under `new_parent` (or root if null). Cycles are rejected.
+    void set_parent(entt::entity e, entt::entity new_parent);
+
+    // Computes the world transform by walking up to the root. O(depth).
+    mat4 world_matrix(entt::entity e) const;
+
+    // Depth-first traversal in child order. Visitor is called for each entity
+    // including the root.
+    void for_each(const std::function<void(entt::entity)>& visit) const;
+
+    // Render every visible sprite with its world transform applied. Sprites
+    // with !texture.valid() are skipped (texture resolution is the host's job).
+    void render_sprites(SpriteBatch& batch) const;
+
+private:
+    void destroy_recursive(entt::entity e);
+    void detach_from_parent(entt::entity e);
+
+    entt::registry registry_;
+    entt::entity   root_{entt::null};
+};
+
+}  // namespace vaxelis
