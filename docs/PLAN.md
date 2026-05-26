@@ -20,7 +20,7 @@ demo on Windows; WASM is a post-v1 stretch.
 - **M4** — Box2D + Lua/sol2 + RigidBody2D component. ✅
 - **M5** — Asset pipeline + hot reload (PNG, Lua, TMJ). ✅ (PNG+Lua; TMJ in M6)
 - **M6** — Tiled (.tmj) level loading + camera. ✅
-- **M7** — Platformer demo: 3 levels, enemies, audio, win screen. **v1 done.**
+- **M7** — Platformer demo: 3 levels, enemies, audio, win screen. ✅ **v1 done.** (audio cues are logged hooks pending real .wav assets)
 - **M8** — WASM port (Emscripten + WebGL2 backend variant).
 
 ## RHI design
