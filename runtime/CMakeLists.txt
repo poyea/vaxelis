@@ -10,3 +10,11 @@ if(WIN32)
             $<TARGET_FILE_DIR:vaxelis_runtime>
     )
 endif()
+
+# Mirror runtime/assets/ next to the exe so relative paths in scripts work
+# regardless of where the binary is launched from.
+add_custom_command(TARGET vaxelis_runtime POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_CURRENT_SOURCE_DIR}/assets
+        $<TARGET_FILE_DIR:vaxelis_runtime>/assets
+)

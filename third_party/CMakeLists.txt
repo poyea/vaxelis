@@ -32,6 +32,32 @@ target_include_directories(entt INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/entt/singl
 add_library(nlohmann_json INTERFACE)
 target_include_directories(nlohmann_json INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/json/single_include)
 
+# --- Box2D v3 ---
+set(BOX2D_SAMPLES      OFF CACHE BOOL "" FORCE)
+set(BOX2D_UNIT_TESTS   OFF CACHE BOOL "" FORCE)
+set(BOX2D_BENCHMARKS   OFF CACHE BOOL "" FORCE)
+set(BOX2D_DOCS         OFF CACHE BOOL "" FORCE)
+set(BOX2D_VALIDATE     OFF CACHE BOOL "" FORCE)
+add_subdirectory(box2d EXCLUDE_FROM_ALL)
+
+# --- Lua 5.4 (upstream has no CMakeLists; build via single-file onelua.c) ---
+add_library(lua STATIC lua/onelua.c)
+target_include_directories(lua PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lua)
+target_compile_definitions(lua PRIVATE MAKE_LIB)
+if(WIN32)
+    target_compile_definitions(lua PRIVATE _CRT_SECURE_NO_WARNINGS)
+endif()
+if(MSVC)
+    target_compile_options(lua PRIVATE /W0)
+else()
+    target_compile_options(lua PRIVATE -w)
+endif()
+
+# --- sol2 (header-only C++ binding for Lua) ---
+add_library(sol2 INTERFACE)
+target_include_directories(sol2 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/sol2/include)
+target_link_libraries(sol2 INTERFACE lua)
+
 # --- Dear ImGui (no shipped CMakeLists). Build core + SDL3/OpenGL3 backends. ---
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
 add_library(imgui STATIC

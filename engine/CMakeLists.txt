@@ -4,6 +4,7 @@ add_library(vaxelis_engine STATIC
     core/Time.cpp
     core/Application.cpp
     input/Input.cpp
+    physics/Physics2D.cpp
     rhi/Rhi.cpp
     rhi/gl/GLLoader.cpp
     rhi/gl/GLDevice.cpp
@@ -11,6 +12,7 @@ add_library(vaxelis_engine STATIC
     renderer/SpriteRenderer.cpp
     scene/Scene.cpp
     scene/SceneSerializer.cpp
+    script/Script.cpp
     debug/ImGuiLayer.cpp
     debug/SceneInspector.cpp
 )
@@ -24,10 +26,12 @@ target_link_libraries(vaxelis_engine
         spdlog::spdlog
         imgui   # transitively used by debug overlay code in clients
         entt    # public — components live in headers clients include
+        box2d   # public — physics components expose b2*Id handles
     PRIVATE
         stb
         miniaudio
         nlohmann_json
+        sol2
 )
 
 if(WIN32)
