@@ -20,6 +20,10 @@ add_subdirectory(SDL EXCLUDE_FROM_ALL)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
 
+# --- miniaudio (header-only; implementation compiled in engine/audio/Audio.cpp) ---
+add_library(miniaudio INTERFACE)
+target_include_directories(miniaudio INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/miniaudio)
+
 # --- Dear ImGui (no shipped CMakeLists). Build core + SDL3/OpenGL3 backends. ---
 set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
 add_library(imgui STATIC

@@ -3,8 +3,10 @@
 #include <memory>
 #include <string>
 
+#include "engine/audio/Audio.hpp"
 #include "engine/core/Time.hpp"
 #include "engine/debug/ImGuiLayer.hpp"
+#include "engine/input/Input.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/rhi/Rhi.hpp"
 
@@ -37,15 +39,20 @@ public:
 
 protected:
     virtual void on_init()                                  {}
-    virtual void on_update(float /*dt*/)                    {}
+    virtual void on_fixed_update(float /*fixed_dt*/)        {}  // deterministic, called 0..N times/frame
+    virtual void on_update(float /*frame_dt*/)              {}  // variable, once per frame
     virtual void on_render()                                {}
     virtual void on_imgui()                                 {}
     virtual void on_shutdown()                              {}
 
     rhi::IDevice&  device()         { return *device_; }
+    Input&         input()          { return input_; }
+    Audio&         audio()          { return audio_; }
     uint32_t       width()    const { return fb_width_; }
     uint32_t       height()   const { return fb_height_; }
     vec4&          clear_color()    { return clear_color_; }
+
+    static constexpr float kFixedDt = 1.0f / 60.0f;
 
 private:
     void shutdown_subsystems() noexcept;
@@ -56,8 +63,12 @@ private:
     void* gl_ctx_{nullptr};
     std::unique_ptr<rhi::IDevice> device_;
     ImGuiLayer imgui_;
+    Input  input_;
+    Audio  audio_;
     bool imgui_inited_{false};
+    bool audio_inited_{false};
     Clock clock_;
+    double accumulator_{0.0};
     vec4 clear_color_{0.1f, 0.12f, 0.15f, 1.0f};
     uint32_t fb_width_{0};
     uint32_t fb_height_{0};

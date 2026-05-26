@@ -50,12 +50,20 @@ bool Application::init() {
 
     imgui_.init(window_, gl_ctx_);
     imgui_inited_ = true;
+
+    if (!audio_.init()) {
+        VX_WARN("Audio init failed; continuing without sound");
+    } else {
+        audio_inited_ = true;
+    }
+
     refresh_drawable_size();
     inited_ = true;
     return true;
 }
 
 void Application::shutdown_subsystems() noexcept {
+    if (audio_inited_) { audio_.shutdown(); audio_inited_ = false; }
     if (imgui_inited_) { imgui_.shutdown(); imgui_inited_ = false; }
     device_.reset();
     if (gl_ctx_) { SDL_GL_DestroyContext(static_cast<SDL_GLContext>(gl_ctx_)); gl_ctx_ = nullptr; }
@@ -79,10 +87,17 @@ int Application::run() {
     on_init();
     clock_.tick();  // discard the construction-to-first-frame delta
 
+    // Fixed-timestep with accumulator. Caps catch-up steps so a long pause
+    // (debugger break, alt-tab) doesn't trigger the spiral of death.
+    constexpr int kMaxStepsPerFrame = 8;
+
     while (running_) {
+        input_.begin_frame();
+
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
             imgui_.process_event(ev);
+            input_.on_event(ev);
             if (ev.type == SDL_EVENT_QUIT) running_ = false;
             if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE) running_ = false;
             if (ev.type == SDL_EVENT_WINDOW_RESIZED ||
@@ -91,8 +106,19 @@ int Application::run() {
             }
         }
 
-        float dt = clock_.tick();
-        on_update(dt);
+        float frame_dt = clock_.tick();
+        // Clamp absurd deltas (paused under debugger) to avoid huge accumulator.
+        if (frame_dt > 0.25f) frame_dt = 0.25f;
+
+        accumulator_ += frame_dt;
+        int steps = 0;
+        while (accumulator_ >= kFixedDt && steps < kMaxStepsPerFrame) {
+            on_fixed_update(kFixedDt);
+            accumulator_ -= kFixedDt;
+            ++steps;
+        }
+        if (steps == kMaxStepsPerFrame) accumulator_ = 0.0;  // drop residual on overrun
+        on_update(frame_dt);
 
         device_->begin_frame(clear_color_, fb_width_, fb_height_);
         on_render();

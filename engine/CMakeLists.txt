@@ -1,7 +1,9 @@
 add_library(vaxelis_engine STATIC
+    audio/Audio.cpp
     core/Log.cpp
     core/Time.cpp
     core/Application.cpp
+    input/Input.cpp
     rhi/Rhi.cpp
     rhi/gl/GLLoader.cpp
     rhi/gl/GLDevice.cpp
@@ -20,14 +22,15 @@ target_link_libraries(vaxelis_engine
         imgui   # transitively used by debug overlay code in clients
     PRIVATE
         stb
+        miniaudio
 )
 
 if(WIN32)
     target_link_libraries(vaxelis_engine PUBLIC opengl32)
 elseif(APPLE)
-    target_link_libraries(vaxelis_engine PUBLIC "-framework OpenGL")
+    target_link_libraries(vaxelis_engine PUBLIC "-framework OpenGL" "-framework CoreAudio" "-framework AudioToolbox")
 else()
-    target_link_libraries(vaxelis_engine PUBLIC GL)
+    target_link_libraries(vaxelis_engine PUBLIC GL pthread dl m)
 endif()
 
 vaxelis_apply_target_options(vaxelis_engine)

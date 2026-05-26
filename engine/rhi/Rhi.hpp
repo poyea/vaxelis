@@ -69,10 +69,14 @@ public:
     virtual void begin_frame(vec4 clear_color, uint32_t fb_width, uint32_t fb_height) = 0;
     virtual void end_frame() = 0;
 
-    // Hard-coded textured-quad draw used by SpriteRenderer for M1.
-    // mvp: model-view-projection. vb: position+uv interleaved. ib: u16 indices.
-    virtual void draw_textured_quad(ShaderHandle, BufferHandle vb, BufferHandle ib,
-                                    uint32_t index_count, TextureHandle, const mat4& mvp) = 0;
+    // Batched sprite draw. Vertex layout (interleaved, stride 32 bytes):
+    //   layout(location=0) vec2 a_pos
+    //   layout(location=1) vec2 a_uv
+    //   layout(location=2) vec4 a_color
+    // Indices are u16. `proj` is the projection matrix; per-quad transforms
+    // are pre-baked into vertex positions on the CPU side.
+    virtual void draw_sprite_batch(ShaderHandle, BufferHandle vb, BufferHandle ib,
+                                   uint32_t index_count, TextureHandle, const mat4& proj) = 0;
 };
 
 // Factory. Returns BackendUnavailable for stubs (e.g. Vulkan in M1).

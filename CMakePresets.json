@@ -1,64 +1,32 @@
 {
     "version": 6,
-    "cmakeMinimumRequired": {
-        "major": 3,
-        "minor": 28,
-        "patch": 0
-    },
+    "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
     "configurePresets": [
         {
             "name": "debug",
             "generator": "Ninja",
             "binaryDir": "${sourceDir}/build/debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS": "OFF",
-                "CPP_PACKAGE_BOILERPLATE_BUILD_DOCS": "OFF"
-            }
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
         },
         {
             "name": "release",
-            "inherits": [
-                "debug"
-            ],
+            "inherits": ["debug"],
             "binaryDir": "${sourceDir}/build/release",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
         },
         {
-            "name": "ci",
-            "inherits": [
-                "debug"
-            ],
-            "binaryDir": "${sourceDir}/build/ci",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "CPP_PACKAGE_BOILERPLATE_ENABLE_SANITIZERS": "OFF"
-            }
+            "name": "vs",
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build/vs",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
         }
     ],
     "buildPresets": [
-        {
-            "name": "debug",
-            "configurePreset": "debug"
-        },
-        {
-            "name": "release",
-            "configurePreset": "release"
-        },
-        {
-            "name": "ci",
-            "configurePreset": "ci"
-        }
+        { "name": "debug",   "configurePreset": "debug" },
+        { "name": "release", "configurePreset": "release" },
+        { "name": "vs",      "configurePreset": "vs" }
     ],
     "testPresets": [
-        {
-            "name": "debug",
-            "configurePreset": "debug",
-            "output": {
-                "outputOnFailure": true
-            }
-        }
+        { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true } }
     ]
 }
