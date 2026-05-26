@@ -1,4 +1,6 @@
 add_library(vaxelis_engine STATIC
+    assets/AssetCache.cpp
+    assets/FileWatcher.cpp
     audio/Audio.cpp
     core/Log.cpp
     core/Time.cpp

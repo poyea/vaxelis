@@ -18,7 +18,7 @@ demo on Windows; WASM is a post-v1 stretch.
 - **M2** — Sprite batcher, fixed-timestep loop, input action map, audio. ✅
 - **M3** — Scene tree + entt + JSON serialization + ImGui inspector. ✅
 - **M4** — Box2D + Lua/sol2 + RigidBody2D component. ✅
-- **M5** — Asset pipeline + hot reload (PNG, Lua, TMJ).
+- **M5** — Asset pipeline + hot reload (PNG, Lua, TMJ). ✅ (PNG+Lua; TMJ in M6)
 - **M6** — Tiled (.tmj) level loading + camera.
 - **M7** — Platformer demo: 3 levels, enemies, audio, win screen. **v1 done.**
 - **M8** — WASM port (Emscripten + WebGL2 backend variant).

@@ -6,6 +6,8 @@
 #include <SDL3/SDL_scancode.h>
 #include <imgui.h>
 
+#include "engine/assets/AssetCache.hpp"
+#include "engine/assets/FileWatcher.hpp"
 #include "engine/core/Application.hpp"
 #include "engine/core/Log.hpp"
 #include "engine/debug/SceneInspector.hpp"
@@ -26,20 +28,28 @@ std::vector<uint8_t> make_solid(uint32_t w, uint32_t h, uint8_t r, uint8_t g, ui
     return px;
 }
 
-class M4Demo final : public vaxelis::Application {
+class M5Demo final : public vaxelis::Application {
 public:
     using Application::Application;
 
 protected:
     void on_init() override {
-        auto tex_from = [&](const std::vector<uint8_t>& px, uint32_t w, uint32_t h) {
-            return device().create_texture({.width = w, .height = h,
-                                            .format = vaxelis::rhi::TextureFormat::RGBA8,
-                                            .initial_data = px.data()}).value_or(vaxelis::rhi::TextureHandle{});
-        };
-        textures_["white"]  = tex_from(make_solid(8, 8, 255, 255, 255), 8, 8);
-        textures_["ground"] = tex_from(make_solid(8, 8, 90, 110, 130),  8, 8);
-        textures_["box"]    = tex_from(make_solid(8, 8, 220, 160, 60),  8, 8);
+        assets_.init(device(), &watcher_);
+        // Procedural colour swatches registered in the cache so the scene's
+        // texture_key lookups go through the same path as on-disk PNGs.
+        register_procedural("white",  make_solid(8, 8, 255, 255, 255));
+        register_procedural("ground", make_solid(8, 8, 90, 110, 130));
+        register_procedural("box",    make_solid(8, 8, 220, 160, 60));
+
+        // When any cached texture reloads (e.g. PNG edited on disk), rebind
+        // matching SpriteComponents to the fresh handle.
+        assets_.add_listener([this](std::string_view key, vaxelis::rhi::TextureHandle h) {
+            auto view = scene_.registry().view<vaxelis::SpriteComponent>();
+            for (auto e : view) {
+                auto& s = view.get<vaxelis::SpriteComponent>(e);
+                if (s.texture_key == key) s.texture = h;
+            }
+        });
 
         if (!batch_.init(device())) { VX_ERROR("SpriteBatch init failed"); return; }
 
@@ -52,7 +62,12 @@ protected:
 
         build_scene();
         resolve_textures();
-        VX_INFO("M4Demo: ready");
+        watch_scripts();
+        VX_INFO("M5Demo: ready");
+    }
+
+    void on_update(float dt) override {
+        watcher_.tick(dt);
     }
 
     void on_fixed_update(float dt) override {
@@ -77,7 +92,7 @@ protected:
     }
 
     void on_imgui() override {
-        ImGui::Begin("Vaxelis M4");
+        ImGui::Begin("Vaxelis M5");
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
         ImGui::Text("Batch: %u quads / %u draws", batch_.quads(), batch_.draw_calls());
         if (player_ != entt::null) {
@@ -91,11 +106,25 @@ protected:
     void on_shutdown() override {
         physics_.shutdown();
         batch_.shutdown(device());
-        for (auto& [_, h] : textures_) if (h.valid()) device().destroy(h);
-        textures_.clear();
+        assets_.shutdown();
     }
 
 private:
+    void register_procedural(const char* key, const std::vector<uint8_t>& px) {
+        // Direct create on device, then stash a fake entry in the cache so
+        // get_texture(key) works the same for procedural + disk-loaded.
+        auto h = device().create_texture({.width = 8, .height = 8,
+                                          .format = vaxelis::rhi::TextureFormat::RGBA8,
+                                          .initial_data = px.data()})
+                          .value_or(vaxelis::rhi::TextureHandle{});
+        procedural_[key] = h;
+    }
+
+    vaxelis::rhi::TextureHandle texture_for(const std::string& key) const {
+        if (auto it = procedural_.find(key); it != procedural_.end()) return it->second;
+        return assets_.get_texture(key);
+    }
+
     entt::entity spawn_sprite(const char* name, vaxelis::vec2 pos, vaxelis::vec2 size,
                               const char* tex_key, vaxelis::vec4 color = vaxelis::vec4(1.0f)) {
         auto e = scene_.create_node(name);
@@ -139,8 +168,26 @@ private:
         auto view = scene_.registry().view<vaxelis::SpriteComponent>();
         for (auto e : view) {
             auto& s = view.get<vaxelis::SpriteComponent>(e);
-            auto it = textures_.find(s.texture_key);
-            s.texture = (it != textures_.end()) ? it->second : vaxelis::rhi::TextureHandle{};
+            s.texture = texture_for(s.texture_key);
+        }
+    }
+
+    // Watch every ScriptComponent's .lua file; on change, clear `loaded` so
+    // ScriptHost::update re-runs the file next tick.
+    void watch_scripts() {
+        auto view = scene_.registry().view<vaxelis::ScriptComponent>();
+        for (auto e : view) {
+            auto& sc = view.get<vaxelis::ScriptComponent>(e);
+            if (sc.path.empty()) continue;
+            const auto target_entity = e;
+            watcher_.watch(sc.path, [this, target_entity](const std::string& path) {
+                if (!scene_.registry().valid(target_entity)) return;
+                auto* sc2 = scene_.registry().try_get<vaxelis::ScriptComponent>(target_entity);
+                if (sc2) {
+                    sc2->loaded = false;
+                    VX_INFO("Script reload: {}", path);
+                }
+            });
         }
     }
 
@@ -149,14 +196,16 @@ private:
     vaxelis::SceneInspector  inspector_;
     vaxelis::Physics2D       physics_;
     vaxelis::ScriptHost      scripts_;
+    vaxelis::FileWatcher     watcher_;
+    vaxelis::AssetCache      assets_;
     entt::entity             player_{entt::null};
-    std::unordered_map<std::string, vaxelis::rhi::TextureHandle> textures_;
+    std::unordered_map<std::string, vaxelis::rhi::TextureHandle> procedural_;
 };
 
 }  // namespace
 
 int main(int /*argc*/, char* /*argv*/[]) {
-    M4Demo app({.title = "Vaxelis - M4", .width = 1280, .height = 720});
+    M5Demo app({.title = "Vaxelis - M5", .width = 1280, .height = 720});
     if (!app.init()) return 1;
     return app.run();
 }
