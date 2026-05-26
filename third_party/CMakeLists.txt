@@ -1,0 +1,46 @@
+# Third-party dependencies. All warnings suppressed, EXCLUDE_FROM_ALL.
+
+# --- glm (header-only target glm::glm) ---
+set(GLM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(glm EXCLUDE_FROM_ALL)
+
+# --- spdlog ---
+set(SPDLOG_BUILD_EXAMPLE OFF CACHE BOOL "" FORCE)
+set(SPDLOG_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(spdlog EXCLUDE_FROM_ALL)
+
+# --- SDL3 ---
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_SHARED ON CACHE BOOL "" FORCE)
+set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+add_subdirectory(SDL EXCLUDE_FROM_ALL)
+
+# --- stb (header-only INTERFACE) ---
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
+
+# --- Dear ImGui (no shipped CMakeLists). Build core + SDL3/OpenGL3 backends. ---
+set(IMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/imgui)
+add_library(imgui STATIC
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+)
+target_include_directories(imgui PUBLIC ${IMGUI_DIR} ${IMGUI_DIR}/backends)
+target_link_libraries(imgui PUBLIC SDL3::SDL3)
+
+# Silence third-party warnings.
+if(MSVC)
+    target_compile_options(imgui PRIVATE /W0)
+else()
+    target_compile_options(imgui PRIVATE -w)
+endif()
+
+# --- GL loader: use a vendored single-file glad (generated for GL 4.5 core). ---
+# We embed a minimal hand-rolled loader instead to avoid another submodule.
+# See engine/rhi/gl/GLLoader.{hpp,cpp}.

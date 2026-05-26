@@ -1,15 +1,14 @@
 include(FetchContent)
-
 FetchContent_Declare(
-    googletest
-    URL https://github.com/google/googletest/archive/refs/tags/v1.16.0.tar.gz)
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.5.4
+)
+FetchContent_MakeAvailable(Catch2)
 
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+add_executable(vaxelis_tests test_rhi.cpp)
+target_link_libraries(vaxelis_tests PRIVATE vaxelis_engine Catch2::Catch2WithMain)
+vaxelis_apply_target_options(vaxelis_tests)
 
-add_executable(${PROJECT_NAME}_tests test_mylib.cpp)
-target_link_libraries(${PROJECT_NAME}_tests PRIVATE ${PROJECT_NAME}::${PROJECT_NAME} GTest::gtest_main)
-cpp_package_boilerplate_apply_target_options(${PROJECT_NAME}_tests)
-
-include(GoogleTest)
-gtest_discover_tests(${PROJECT_NAME}_tests)
+include(Catch)
+catch_discover_tests(vaxelis_tests)
