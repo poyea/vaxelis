@@ -92,7 +92,8 @@ void Scene::render_sprites(SpriteBatch& batch) const {
     };
     std::vector<Item> items;
     auto view = registry_.view<const SpriteComponent>();
-    items.reserve(view.size_hint());
+    // entt's view::size_hint is only available for in-place storage; skip the
+    // hint and let the vector grow.
     for (auto e : view) {
         const auto& s = view.get<const SpriteComponent>(e);
         if (!s.visible || !s.texture.valid()) continue;
