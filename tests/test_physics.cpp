@@ -14,7 +14,8 @@ TEST_CASE("Physics2D: dynamic body falls under gravity") {
     Scene s;
     auto e = s.create_node("Box");
     s.registry().get<Transform2D>(e).position = {0.0f, 0.0f};
-    s.registry().emplace<RigidBody2D>(e);                              // dynamic
+    // Dynamic body by default.
+    s.registry().emplace<RigidBody2D>(e);
     s.registry().emplace<BoxCollider2D>(e).half_extents = {16.0f, 16.0f};
 
     // Create body + simulate ~0.5s in fixed steps.
@@ -24,7 +25,8 @@ TEST_CASE("Physics2D: dynamic body falls under gravity") {
         phys.sync_to_scene(s);
     }
     const auto& t = s.registry().get<Transform2D>(e);
-    REQUIRE(t.position.y > 50.0f);  // should have fallen well past start
+    // Should have fallen well past start.
+    REQUIRE(t.position.y > 50.0f);
 
     phys.shutdown();
 }

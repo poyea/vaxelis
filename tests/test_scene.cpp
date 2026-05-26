@@ -17,7 +17,8 @@ TEST_CASE("Scene: create/destroy nodes and hierarchy") {
     REQUIRE(s.registry().get<Hierarchy>(c).parent == b);
     REQUIRE(s.registry().get<Hierarchy>(a).children.size() == 1);
 
-    s.destroy_node(a);  // cascades to b and c
+    // Cascades to b and c.
+    s.destroy_node(a);
     REQUIRE_FALSE(s.registry().valid(a));
     REQUIRE_FALSE(s.registry().valid(b));
     REQUIRE_FALSE(s.registry().valid(c));
@@ -64,7 +65,8 @@ TEST_CASE("Scene: JSON round-trip preserves hierarchy and components") {
     // Find the child by name.
     entt::entity found = entt::null;
     loaded.for_each([&](entt::entity e) {
-        if (loaded.registry().get<Name>(e).value == "Child") found = e;
+        if (loaded.registry().get<Name>(e).value == "Child")
+            found = e;
     });
     REQUIRE(found != entt::null);
     const auto& lt = loaded.registry().get<Transform2D>(found);

@@ -21,8 +21,8 @@ TEST_CASE("TiledMap: parses inline JSON with one tile layer + one object") {
     })";
 
     TiledMap m;
-    REQUIRE(tiled::load_string(m, kJson,
-        [](const std::string&) { return rhi::TextureHandle{42}; }));
+    REQUIRE(tiled::load_string(
+        m, kJson, [](const std::string&) { return rhi::TextureHandle{42}; }));
 
     REQUIRE(m.width == 3);
     REQUIRE(m.height == 2);

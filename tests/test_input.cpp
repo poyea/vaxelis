@@ -13,7 +13,7 @@ SDL_Event key_event(Uint32 type, SDL_Scancode sc) {
     ev.key.scancode = sc;
     return ev;
 }
-}  // namespace
+} // namespace
 
 TEST_CASE("Input: down/pressed/released edges") {
     Input in;
