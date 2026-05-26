@@ -2,9 +2,8 @@ name: docs
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  # Push trigger disabled: project has no docs target yet; re-enable once
+  # CMakeLists adds Doxygen.
 
 permissions:
   contents: read
@@ -16,8 +15,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install docs toolchain
-        run: sudo apt-get update && sudo apt-get install -y cmake doxygen graphviz ninja-build
+        with:
+          submodules: recursive
+      - name: Install docs toolchain + SDL deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake doxygen graphviz ninja-build pkg-config \
+            libasound2-dev libpulse-dev libjack-dev libsndio-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libudev-dev libwayland-dev libdecor-0-dev
       - name: Configure docs
         run: cmake -S . -B build/docs -G Ninja -DCPP_PACKAGE_BOILERPLATE_BUILD_TESTS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=ON
       - name: Build docs
