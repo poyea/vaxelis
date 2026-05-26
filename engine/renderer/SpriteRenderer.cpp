@@ -81,10 +81,14 @@ void SpriteBatch::shutdown(rhi::IDevice& device) {
 }
 
 void SpriteBatch::begin(rhi::IDevice& device, uint32_t screen_w, uint32_t screen_h) {
+    begin(device, glm::ortho(0.0f, static_cast<float>(screen_w),
+                             static_cast<float>(screen_h), 0.0f, -1.0f, 1.0f));
+}
+
+void SpriteBatch::begin(rhi::IDevice& device, const mat4& projection) {
     assert(!in_frame_ && "SpriteBatch::begin called twice without end");
     device_ = &device;
-    proj_ = glm::ortho(0.0f, static_cast<float>(screen_w),
-                       static_cast<float>(screen_h), 0.0f, -1.0f, 1.0f);
+    proj_   = projection;
     current_tex_ = {};
     verts_.clear();
     draw_calls_ = 0;

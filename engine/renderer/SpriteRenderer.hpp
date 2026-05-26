@@ -23,6 +23,9 @@ public:
 
     // Set up the screen-space orthographic projection for this frame.
     void begin(rhi::IDevice& device, uint32_t screen_w, uint32_t screen_h);
+
+    // Custom projection (e.g. from Camera2D::projection()).
+    void begin(rhi::IDevice& device, const mat4& projection);
     void end();
 
     // Centered quad. `uv` defaults to full texture (0,0)-(1,1).

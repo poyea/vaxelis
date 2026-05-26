@@ -15,6 +15,7 @@ add_library(vaxelis_engine STATIC
     scene/Scene.cpp
     scene/SceneSerializer.cpp
     script/Script.cpp
+    tilemap/TiledMap.cpp
     debug/ImGuiLayer.cpp
     debug/SceneInspector.cpp
 )
