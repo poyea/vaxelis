@@ -1,122 +1,41 @@
-# cpp-package-boilerplate [![ci](https://github.com/poyea/cpp-package-boilerplate/actions/workflows/ci.yml/badge.svg)](https://github.com/poyea/cpp-package-boilerplate/actions/workflows/ci.yml)
+# vaxelis [![ci](https://github.com/poyea/vaxelis/actions/workflows/ci.yml/badge.svg)](https://github.com/poyea/vaxelis/actions/workflows/ci.yml)
 
-Modern C++ package boilerplate with CMake, tests, benchmarks, docs, devcontainers, Docker, and GitHub Actions.
+A C++23 hybrid 2D/3D game engine. v1 ships a playable 2D platformer demo on Windows, Linux, and macOS.
 
-## What this template supports
+## Stack
 
-- C++23 by default, with compiler checks for recent toolchains.
-- Compiled library, header-only library, CLI, or mixed library plus CLI layouts.
-- GoogleTest-based unit tests and Google Benchmark integration.
-- Doxygen documentation generation.
-- Dev container and Codespaces setup with a repository-owned toolchain.
-- Docker build support for a runnable runtime image.
-- Clang-format, strict warnings, sanitizers, and release LTO.
+SDL3 · OpenGL 4.5 · glm · Dear ImGui · spdlog · stb · miniaudio · entt · nlohmann/json · Box2D · Lua 5.4 · sol2
 
-## Prerequisites
-
-**Required:**
-
-| Tool | Minimum version | Purpose |
-|---|---|---|
-| CMake | 3.28 | Build system |
-| GCC | 13 | C++ compiler (Linux/Windows) |
-| Clang | 18 | C++ compiler (alternative) |
-| AppleClang | 16 | C++ compiler (macOS) |
-| MSVC | 19.38 (VS 2022 17.8) | C++ compiler (Windows) |
-| Ninja | 1.11 | Build tool |
-| Git | 2 | Source control |
-
-**Feature-specific tools:**
-
-| Tool | Purpose |
-|---|---|
-| clang-format | Code formatting (`scripts/format.sh`) |
-| Doxygen + Graphviz | API documentation (`BUILD_DOCS=ON`) |
-| Valgrind | Profiling (`scripts/build.sh --profile callgrind`) |
-| perf | Profiling (`scripts/build.sh --profile perf`, Linux only) |
-| Docker | Runtime container image |
-
-**Install on Ubuntu/Debian:**
+## Build
 
 ```bash
-bash scripts/install_tools.sh
+git clone --recursive https://github.com/poyea/vaxelis.git
+cd vaxelis
+cmake -S . -B build -G Ninja
+cmake --build build
+./build/runtime/vaxelis_runtime
 ```
 
-**Dev container / Codespaces:** all tools are pre-installed — no manual setup needed.
-
-## Quick start
+If you forgot `--recursive`:
 
 ```bash
-cmake --preset debug
-cmake --build --preset debug
-ctest --preset debug
+git submodule update --init --recursive
 ```
 
-Or use the helper script:
+**Toolchain:** GCC 13+, Clang 18+, AppleClang 16+, or MSVC 19.38+ (VS 2022 17.8). CMake 3.28+, Ninja.
 
-`bash scripts/build.sh --preset debug --test`
+**Linux deps:** `libasound2-dev libpulse-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxkbcommon-dev libwayland-dev libgl-dev libdbus-1-dev libudev-dev`
 
-## Project options
-
-Key CMake options:
-
-- `CPP_PACKAGE_BOILERPLATE_BUILD_LIBRARY=ON|OFF`
-- `CPP_PACKAGE_BOILERPLATE_BUILD_CLI=ON|OFF`
-- `CPP_PACKAGE_BOILERPLATE_HEADER_ONLY=ON|OFF`
-- `CPP_PACKAGE_BOILERPLATE_BUILD_TESTS=ON|OFF`
-- `CPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=ON|OFF`
-- `CPP_PACKAGE_BOILERPLATE_BUILD_DOCS=ON|OFF`
-
-Examples:
+## Test
 
 ```bash
-cmake -S . -B build/header-only -G Ninja -DCPP_PACKAGE_BOILERPLATE_HEADER_ONLY=ON
-cmake -S . -B build/library-only -G Ninja -DCPP_PACKAGE_BOILERPLATE_BUILD_CLI=OFF
-cmake -S . -B build/full -G Ninja -DCPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=ON -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=ON
+ctest --test-dir build --output-on-failure
 ```
 
-## Repository layout
+## Layout
 
-- `cmake/`: shared compiler and toolchain settings
-- `include/`: public headers
-- `src/`: compiled library and CLI sources
-- `tests/`: unit tests
-- `benchmarks/`: performance benchmarks
-- `docs/`: Doxygen configuration
-- `.devcontainer/`: development container for VS Code and Codespaces
-- `.github/workflows/`: CI, docs, and Docker automation
-- `scripts/`: local developer helpers
-
-## Formatting
-
-```bash
-bash scripts/format.sh
-bash scripts/format.sh --check
 ```
-
-## Benchmarks and profiling
-
-```bash
-bash scripts/build.sh --benchmark
-bash scripts/build.sh --benchmark --benchmark_filter=BM_Add
-bash scripts/build.sh --profile perf
-bash scripts/build.sh --profile callgrind
+engine/    # the engine library (RHI, scene, physics, scripting, …)
+runtime/   # platformer demo + assets
+tests/     # Catch2 unit tests
 ```
-
-## Documentation
-
-```bash
-cmake -S . -B build/docs -G Ninja -DCPP_PACKAGE_BOILERPLATE_BUILD_TESTS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=ON
-cmake --build build/docs --target docs
-```
-
-The GitHub Pages workflow publishes generated Doxygen output from the default branch.
-
-## Container workflows
-
-- Dev container: open the repository in a compatible devcontainer client or GitHub Codespaces.
-- Runtime image: `docker build -t cpp-package-boilerplate:latest .`
-
-## License
-
-MIT
