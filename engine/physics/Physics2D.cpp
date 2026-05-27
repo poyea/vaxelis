@@ -47,6 +47,32 @@ void Physics2D::shutdown() {
     }
 }
 
+void Physics2D::register_with(Scene& scene) {
+    auto& reg = scene.registry();
+    reg.on_destroy<RigidBody2D>().connect<&Physics2D::on_rb_destroyed>(*this);
+    reg.on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
+}
+
+void Physics2D::on_rb_destroyed(entt::registry& reg, entt::entity e) {
+    if (!b2World_IsValid(world_)) return;
+    auto& rb = reg.get<RigidBody2D>(e);
+    if (B2_IS_NULL(rb.body)) return;
+    // Destroying the body also releases any attached shapes (Box2D v3
+    // semantics), so we mark the collider's shape null to keep the C++ state
+    // consistent before the BoxCollider2D destroy-signal fires.
+    if (auto* col = reg.try_get<BoxCollider2D>(e)) col->shape = b2_nullShapeId;
+    b2DestroyBody(rb.body);
+    rb.body = b2_nullBodyId;
+}
+
+void Physics2D::on_col_destroyed(entt::registry& reg, entt::entity e) {
+    if (!b2World_IsValid(world_)) return;
+    auto& col = reg.get<BoxCollider2D>(e);
+    if (B2_IS_NULL(col.shape)) return;
+    b2DestroyShape(col.shape, /*updateBodyMass=*/true);
+    col.shape = b2_nullShapeId;
+}
+
 void Physics2D::step(float dt) {
     if (!b2World_IsValid(world_)) return;
     b2World_Step(world_, dt, cfg_.sub_steps);

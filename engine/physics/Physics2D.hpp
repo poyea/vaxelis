@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include <box2d/box2d.h>
+#include <entt/entt.hpp>
 
 #include "engine/math/Math.hpp"
 
@@ -25,6 +26,12 @@ public:
     void shutdown();
     bool ready() const { return b2World_IsValid(world_); }
 
+    // Hooks entt destroy-signals so that removing RigidBody2D / BoxCollider2D
+    // (or destroying the owning entity) releases the underlying Box2D handles.
+    // Call once per Scene, after `init()`. Connections detach when the
+    // registry is destroyed.
+    void register_with(Scene& scene);
+
     // Advances the world. dt is real seconds. After step(), call sync_to_scene()
     // to push body positions back into the scene's Transform2D components.
     void step(float dt);
@@ -37,6 +44,9 @@ public:
     b2WorldId world() const { return world_; }
 
 private:
+    void on_rb_destroyed(entt::registry& reg, entt::entity e);
+    void on_col_destroyed(entt::registry& reg, entt::entity e);
+
     b2WorldId world_{b2_nullWorldId};
     Config    cfg_{};
     float     ppm_{100.0f};

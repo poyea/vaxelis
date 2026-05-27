@@ -222,6 +222,7 @@ private:
         state_ = GameState::Playing;
 
         physics_.init({.gravity = {0.0f, 1400.0f}, .pixels_per_meter = 100.0f, .sub_steps = 4});
+        physics_.register_with(scene_);
 
         if (!vaxelis::tiled::load_file(map_, level_path(n),
                 [this](const std::string& img) { return texture_for(img); })) {

@@ -31,6 +31,30 @@ TEST_CASE("Physics2D: dynamic body falls under gravity") {
     phys.shutdown();
 }
 
+TEST_CASE("Physics2D: destroying entity releases the Box2D body") {
+    Physics2D phys;
+    REQUIRE(phys.init({}));
+
+    Scene s;
+    phys.register_with(s);
+
+    auto e = s.create_node("Box");
+    s.registry().emplace<RigidBody2D>(e);
+    s.registry().emplace<BoxCollider2D>(e).half_extents = {8.0f, 8.0f};
+    phys.sync_to_scene(s);
+
+    const auto body_id = s.registry().get<RigidBody2D>(e).body;
+    REQUIRE_FALSE(B2_IS_NULL(body_id));
+    REQUIRE(b2Body_IsValid(body_id));
+
+    s.destroy_node(e);
+    // After destroy, the body must be gone from Box2D's perspective even
+    // though we still hold the id locally.
+    REQUIRE_FALSE(b2Body_IsValid(body_id));
+
+    phys.shutdown();
+}
+
 TEST_CASE("Physics2D: static body does not move") {
     Physics2D phys;
     REQUIRE(phys.init({}));

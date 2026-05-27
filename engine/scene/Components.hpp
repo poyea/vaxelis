@@ -42,6 +42,12 @@ struct Transform2D {
     }
 };
 
+// Cached world-space transform, written by Scene::update_world_transforms each
+// frame. Renderers read this instead of walking parents per-sprite.
+struct WorldTransform2D {
+    mat4 matrix{1.0f};
+};
+
 // Renderable sprite. `texture_key` is a string ID the host resolves against
 // its asset table — keeps serialization texture-agnostic. `texture` is the
 // runtime-resolved handle, not serialized.

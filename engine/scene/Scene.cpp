@@ -67,11 +67,28 @@ void Scene::set_parent(entt::entity e, entt::entity new_parent) {
 
 mat4 Scene::world_matrix(entt::entity e) const {
     if (e == entt::null || !registry_.valid(e)) return mat4(1.0f);
+    // Prefer cached value if update_world_transforms was called this frame.
+    if (const auto* w = registry_.try_get<WorldTransform2D>(e)) return w->matrix;
     const auto* t = registry_.try_get<Transform2D>(e);
     const auto* h = registry_.try_get<Hierarchy>(e);
     mat4 m = t ? t->local_matrix() : mat4(1.0f);
     if (h && h->parent != entt::null) m = world_matrix(h->parent) * m;
     return m;
+}
+
+void Scene::update_world_transforms() {
+    auto walk = [&](auto& self, entt::entity e, const mat4& parent_world) -> void {
+        if (!registry_.valid(e)) return;
+        mat4 world = parent_world;
+        if (const auto* t = registry_.try_get<Transform2D>(e)) {
+            world = parent_world * t->local_matrix();
+        }
+        registry_.emplace_or_replace<WorldTransform2D>(e, world);
+        if (const auto* h = registry_.try_get<Hierarchy>(e)) {
+            for (auto c : h->children) self(self, c, world);
+        }
+    };
+    walk(walk, root_, mat4(1.0f));
 }
 
 void Scene::for_each(const std::function<void(entt::entity)>& visit) const {
@@ -85,26 +102,33 @@ void Scene::for_each(const std::function<void(entt::entity)>& visit) const {
 }
 
 void Scene::render_sprites(SpriteBatch& batch) const {
-    // Gather visible sprites, sort by z_order, render.
+    // Renderer expects cached world transforms; refresh them once per call.
+    // The const_cast is safe: the cache is a frame-local derivation of existing
+    // scene state, not a logical mutation.
+    const_cast<Scene*>(this)->update_world_transforms();
+
+    // Sort by (z_order, texture_id) so same-texture sprites at the same depth
+    // collapse into a single draw call in the batcher.
     struct Item {
         entt::entity e;
-        int z;
+        int          z;
+        uint32_t     tex;
     };
     std::vector<Item> items;
     auto view = registry_.view<const SpriteComponent>();
-    // entt's view::size_hint is only available for in-place storage; skip the
-    // hint and let the vector grow.
     for (auto e : view) {
         const auto& s = view.get<const SpriteComponent>(e);
         if (!s.visible || !s.texture.valid()) continue;
-        items.push_back({e, s.z_order});
+        items.push_back({e, s.z_order, s.texture.id});
     }
-    std::stable_sort(items.begin(), items.end(),
-                     [](const Item& a, const Item& b) { return a.z < b.z; });
+    std::stable_sort(items.begin(), items.end(), [](const Item& a, const Item& b) {
+        if (a.z != b.z) return a.z < b.z;
+        return a.tex < b.tex;
+    });
     for (const auto& it : items) {
         const auto& s = registry_.get<const SpriteComponent>(it.e);
-        const mat4 w  = world_matrix(it.e);
-        const vec2 pos{w[3].x, w[3].y};
+        const auto& w = registry_.get<WorldTransform2D>(it.e).matrix;
+        const vec2  pos{w[3].x, w[3].y};
         batch.draw(s.texture, pos, s.size, s.uv_rect, s.color);
     }
 }
