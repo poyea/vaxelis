@@ -1,6 +1,6 @@
 # vaxelis [![ci](https://github.com/poyea/vaxelis/actions/workflows/ci.yml/badge.svg)](https://github.com/poyea/vaxelis/actions/workflows/ci.yml)
 
-A C++23 hybrid 2D/3D game engine. v1 ships a playable 2D platformer demo on Windows, Linux, and macOS.
+A C++23 hybrid, cross-platform 2D/3D game engine.
 
 ## Stack
 
