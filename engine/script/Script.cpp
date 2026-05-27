@@ -4,7 +4,16 @@
 #include <string>
 
 #define SOL_ALL_SAFETIES_ON 1
+// sol2 headers contain stray UTF-8 emoji bytes that trigger MSVC C5321 under
+// /WX. Disable just for this translation unit; doesn't affect our own code.
+#if defined(_MSC_VER)
+#  pragma warning(push)
+#  pragma warning(disable : 5321)
+#endif
 #include <sol/sol.hpp>
+#if defined(_MSC_VER)
+#  pragma warning(pop)
+#endif
 
 #include "engine/core/Log.hpp"
 #include "engine/input/Input.hpp"
@@ -33,12 +42,16 @@ bool ScriptHost::init(Scene& scene, Input& input) {
     L.open_libraries(sol::lib::base, sol::lib::math, sol::lib::string,
                      sol::lib::table, sol::lib::os);
 
-    // vec2 type. Read/write fields, plus a constructor and a few helpers.
+    // vec2 type. Bound via property lambdas instead of direct &vec2::x member
+    // pointers — clang-18 / strict C++23 rejects sol2's member-pointer dispatcher
+    // due to a noexcept(...) signature mismatch on the generated thunk.
     L.new_usertype<vec2>(
         "vec2",
         sol::constructors<vec2(), vec2(float, float)>(),
-        "x", &vec2::x,
-        "y", &vec2::y);
+        "x", sol::property([](const vec2& v) { return v.x; },
+                           [](vec2& v, float x) { v.x = x; }),
+        "y", sol::property([](const vec2& v) { return v.y; },
+                           [](vec2& v, float y) { v.y = y; }));
 
     // engine.* namespace.
     auto engine = L["engine"].get_or_create<sol::table>();
