@@ -11,4 +11,16 @@ target_link_libraries(vaxelis_tests PRIVATE vaxelis_engine Catch2::Catch2WithMai
 vaxelis_apply_target_options(vaxelis_tests)
 
 include(Catch)
-catch_discover_tests(vaxelis_tests)
+# DL_PATHS points discovery at SDL3.dll's location on Windows so the test exe
+# can launch (it transitively links SDL3 as a shared library).
+catch_discover_tests(vaxelis_tests
+    DL_PATHS $<TARGET_FILE_DIR:SDL3::SDL3>)
+
+# Also drop SDL3.dll next to the test exe so `ctest` runs work the same way.
+if(WIN32)
+    add_custom_command(TARGET vaxelis_tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:SDL3::SDL3>
+            $<TARGET_FILE_DIR:vaxelis_tests>
+    )
+endif()
