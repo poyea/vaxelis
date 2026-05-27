@@ -19,12 +19,12 @@ std::string_view to_string(RhiError e) {
     std::unreachable();
 }
 
-std::expected<std::unique_ptr<IDevice>, RhiError> create_device(Backend b) {
+vaxelis::expected<std::unique_ptr<IDevice>, RhiError> create_device(Backend b) {
     switch (b) {
         case Backend::OpenGL: return gl::create_gl_device();
         case Backend::Vulkan: return vk::create_vk_device();
     }
-    return std::unexpected(RhiError::BackendUnavailable);
+    return vaxelis::unexpected(RhiError::BackendUnavailable);
 }
 
 }  // namespace vaxelis::rhi

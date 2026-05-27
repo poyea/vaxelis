@@ -1,11 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <expected>
 #include <memory>
 #include <span>
 #include <string_view>
 
+#include "engine/core/Expected.hpp"
 #include "engine/math/Math.hpp"
 
 namespace vaxelis::rhi {
@@ -56,9 +56,9 @@ class IDevice {
 public:
     virtual ~IDevice() = default;
 
-    virtual std::expected<TextureHandle, RhiError> create_texture(const TextureDesc&) = 0;
-    virtual std::expected<ShaderHandle, RhiError>  create_shader(const ShaderDesc&) = 0;
-    virtual std::expected<BufferHandle, RhiError>  create_buffer(const BufferDesc&) = 0;
+    virtual vaxelis::expected<TextureHandle, RhiError> create_texture(const TextureDesc&) = 0;
+    virtual vaxelis::expected<ShaderHandle, RhiError>  create_shader(const ShaderDesc&) = 0;
+    virtual vaxelis::expected<BufferHandle, RhiError>  create_buffer(const BufferDesc&) = 0;
 
     virtual void destroy(TextureHandle) = 0;
     virtual void destroy(ShaderHandle) = 0;
@@ -80,7 +80,7 @@ public:
 };
 
 // Factory. Returns BackendUnavailable for stubs (e.g. Vulkan in M1).
-std::expected<std::unique_ptr<IDevice>, RhiError> create_device(Backend);
+vaxelis::expected<std::unique_ptr<IDevice>, RhiError> create_device(Backend);
 
 // Sanity: handles must remain trivially copyable so they can move around freely.
 static_assert(std::is_trivially_copyable_v<TextureHandle>);

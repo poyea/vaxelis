@@ -36,8 +36,8 @@ public:
         VX_INFO("GLDevice: destroyed");
     }
 
-    std::expected<TextureHandle, RhiError> create_texture(const TextureDesc& d) override {
-        if (d.format != TextureFormat::RGBA8) return std::unexpected(RhiError::UnsupportedFormat);
+    vaxelis::expected<TextureHandle, RhiError> create_texture(const TextureDesc& d) override {
+        if (d.format != TextureFormat::RGBA8) return vaxelis::unexpected(RhiError::UnsupportedFormat);
         GLuint name = 0;
         gl().GenTextures(1, &name);
         gl().BindTexture(GL_TEXTURE_2D, name);
@@ -54,8 +54,8 @@ public:
         return h;
     }
 
-    std::expected<ShaderHandle, RhiError> create_shader(const ShaderDesc& d) override {
-        auto compile = [](GLenum stage, std::string_view src) -> std::expected<GLuint, RhiError> {
+    vaxelis::expected<ShaderHandle, RhiError> create_shader(const ShaderDesc& d) override {
+        auto compile = [](GLenum stage, std::string_view src) -> vaxelis::expected<GLuint, RhiError> {
             GLuint s = gl().CreateShader(stage);
             const GLchar* str = src.data();
             const GLint   len = static_cast<GLint>(src.size());
@@ -70,15 +70,15 @@ public:
                 gl().GetShaderInfoLog(s, log_len, nullptr, log.data());
                 VX_ERROR("GL shader compile failed: {}", log.data());
                 gl().DeleteShader(s);
-                return std::unexpected(RhiError::ShaderCompileFailed);
+                return vaxelis::unexpected(RhiError::ShaderCompileFailed);
             }
             return s;
         };
 
         auto vs = compile(GL_VERTEX_SHADER, d.vertex_src);
-        if (!vs) return std::unexpected(vs.error());
+        if (!vs) return vaxelis::unexpected(vs.error());
         auto fs = compile(GL_FRAGMENT_SHADER, d.fragment_src);
-        if (!fs) { gl().DeleteShader(*vs); return std::unexpected(fs.error()); }
+        if (!fs) { gl().DeleteShader(*vs); return vaxelis::unexpected(fs.error()); }
 
         GLuint prog = gl().CreateProgram();
         gl().AttachShader(prog, *vs);
@@ -95,7 +95,7 @@ public:
             gl().GetProgramInfoLog(prog, log_len, nullptr, log.data());
             VX_ERROR("GL program link failed: {}", log.data());
             gl().DeleteProgram(prog);
-            return std::unexpected(RhiError::ProgramLinkFailed);
+            return vaxelis::unexpected(RhiError::ProgramLinkFailed);
         }
         ShaderHandle h{next_handle_++};
         shaders_.emplace(h.id, GLShader{prog,
@@ -104,7 +104,7 @@ public:
         return h;
     }
 
-    std::expected<BufferHandle, RhiError> create_buffer(const BufferDesc& d) override {
+    vaxelis::expected<BufferHandle, RhiError> create_buffer(const BufferDesc& d) override {
         GLenum target = (d.usage == BufferUsage::Index) ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
         GLenum usage  = (d.access == BufferAccess::Dynamic) ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
         GLuint name = 0;
@@ -196,8 +196,8 @@ private:
 
 }  // namespace
 
-std::expected<std::unique_ptr<IDevice>, RhiError> create_gl_device() {
-    if (!load_gl()) return std::unexpected(RhiError::BackendUnavailable);
+vaxelis::expected<std::unique_ptr<IDevice>, RhiError> create_gl_device() {
+    if (!load_gl()) return vaxelis::unexpected(RhiError::BackendUnavailable);
     return std::unique_ptr<IDevice>(new GLDevice());
 }
 
