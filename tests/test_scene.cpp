@@ -68,7 +68,7 @@ TEST_CASE("Scene: JSON round-trip preserves hierarchy and components") {
         if (loaded.registry().get<Name>(e).value == "Child")
             found = e;
     });
-    REQUIRE(found != entt::null);
+    REQUIRE(loaded.registry().valid(found));
     const auto& lt = loaded.registry().get<Transform2D>(found);
     REQUIRE(lt.position.x == 42.0f);
     REQUIRE(lt.position.y == -7.0f);

@@ -20,7 +20,8 @@ public:
         int   sub_steps{4};
     };
 
-    bool init(const Config& cfg = {});
+    bool init();
+    bool init(const Config& cfg);
     void shutdown();
     bool ready() const { return b2World_IsValid(world_); }
 

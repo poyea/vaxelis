@@ -20,6 +20,10 @@ b2BodyType to_b2(BodyType t) {
 
 }  // namespace
 
+bool Physics2D::init() {
+    return init(Config{});
+}
+
 bool Physics2D::init(const Config& cfg) {
     cfg_ = cfg;
     ppm_ = cfg.pixels_per_meter > 0.0f ? cfg.pixels_per_meter : 100.0f;
@@ -65,7 +69,7 @@ void Physics2D::sync_to_scene(Scene& scene) {
             bd.rotation = b2MakeRot(tr.rotation);
             bd.linearDamping  = rb.linear_damping;
             bd.angularDamping = rb.angular_damping;
-            bd.fixedRotation  = rb.fixed_rotation;
+            bd.motionLocks.angularZ = rb.fixed_rotation;
             bd.gravityScale   = rb.gravity_scale;
             rb.body = b2CreateBody(world_, &bd);
         }
