@@ -44,10 +44,11 @@ TEST_CASE("ScriptHost: destroying an entity tears down its Lua instance") {
 
     s.destroy_node(e);
 
-    // The Lua subtable and host bookkeeping must be gone.
+    // The Lua subtable and host bookkeeping must be gone. (We assert via the
+    // host's accessors rather than indexing host.lua() directly — sol::state's
+    // operator[] needs sol2's full headers, which this TU deliberately avoids.)
     REQUIRE_FALSE(host.has_instance(key));
     REQUIRE(host.instance_count() == 0);
-    REQUIRE_FALSE(host.lua()[key].valid());
 }
 
 TEST_CASE("ScriptHost: erasing the ScriptComponent tears down its Lua instance") {
