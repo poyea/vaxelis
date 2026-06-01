@@ -40,6 +40,13 @@ public:
     // pairs, and writes transforms back from physics bodies to Transform2D.
     void sync_to_scene(Scene& scene);
 
+    // Pushes externally-edited Transform2D values into Box2D (Transform2D ->
+    // body). Call BEFORE step(), pairing with sync_to_scene() after. Only
+    // bodies whose Transform2D changed since the last sync are pushed, so the
+    // simulation stays authoritative for untouched dynamic bodies; a moved
+    // dynamic body is also woken so it doesn't sleep through the change.
+    void sync_from_scene(Scene& scene);
+
     float pixels_per_meter() const { return ppm_; }
     b2WorldId world() const { return world_; }
 

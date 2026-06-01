@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include "engine/physics/Components.hpp"
 #include "engine/physics/Physics2D.hpp"
@@ -51,6 +52,51 @@ TEST_CASE("Physics2D: destroying entity releases the Box2D body") {
     // After destroy, the body must be gone from Box2D's perspective even
     // though we still hold the id locally.
     REQUIRE_FALSE(b2Body_IsValid(body_id));
+
+    phys.shutdown();
+}
+
+TEST_CASE("Physics2D: sync_from_scene pushes external Transform2D edits to the body") {
+    Physics2D phys;
+    REQUIRE(phys.init({.gravity = {0.0f, 0.0f}, .pixels_per_meter = 100.0f, .sub_steps = 4}));
+
+    Scene s;
+    auto e = s.create_node("Mover");
+    s.registry().emplace<RigidBody2D>(e).type = BodyType::Kinematic;
+    s.registry().emplace<BoxCollider2D>(e).half_extents = {8.0f, 8.0f};
+
+    // Body is created at the origin on first sync.
+    phys.sync_to_scene(s);
+    const auto body = s.registry().get<RigidBody2D>(e).body;
+    REQUIRE_FALSE(B2_IS_NULL(body));
+
+    // Move the entity externally, then push scene -> body.
+    s.registry().get<Transform2D>(e).position = {300.0f, 150.0f};
+    phys.sync_from_scene(s);
+
+    const b2Vec2 p = b2Body_GetPosition(body);
+    REQUIRE(p.x == Catch::Approx(3.0f));   // 300px / 100ppm
+    REQUIRE(p.y == Catch::Approx(1.5f));   // 150px / 100ppm
+
+    phys.shutdown();
+}
+
+TEST_CASE("Physics2D: full two-way loop still lets a dynamic body fall") {
+    Physics2D phys;
+    REQUIRE(phys.init({.gravity = {0.0f, 980.0f}, .pixels_per_meter = 100.0f, .sub_steps = 4}));
+
+    Scene s;
+    auto e = s.create_node("Box");
+    s.registry().emplace<RigidBody2D>(e);  // dynamic
+    s.registry().emplace<BoxCollider2D>(e).half_extents = {16.0f, 16.0f};
+
+    phys.sync_to_scene(s);  // create body
+    for (int i = 0; i < 30; ++i) {
+        phys.sync_from_scene(s);  // no external edits -> must not pin the body
+        phys.step(1.0f / 60.0f);
+        phys.sync_to_scene(s);
+    }
+    REQUIRE(s.registry().get<Transform2D>(e).position.y > 50.0f);
 
     phys.shutdown();
 }

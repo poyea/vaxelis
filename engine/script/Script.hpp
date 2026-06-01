@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <string_view>
+
+#include <entt/entt.hpp>
 
 // Forward-declare sol::state to keep sol's heavy headers out of clients.
 namespace sol { class state; }
@@ -29,13 +32,26 @@ public:
     // Binds engine API (vec2, scene helpers, input queries) into the Lua state.
     bool init(Scene& scene, Input& input);
 
+    // Hooks an entt destroy-signal so that removing a ScriptComponent (or
+    // destroying the owning entity) tears down the script's Lua subtable,
+    // letting the table and anything it captured be garbage-collected. Call
+    // once per Scene, after `init()`. The connection detaches when the registry
+    // is destroyed.
+    void register_with(Scene& scene);
+
     // Loads/reloads scripts for every ScriptComponent that needs it, then
     // calls on_update(dt) on each.
     void update(float dt, Scene& scene);
 
     sol::state& lua();
 
+    // True while the host still holds a live Lua subtable for `instance_key`.
+    bool   has_instance(const std::string& instance_key) const;
+    size_t instance_count() const;
+
 private:
+    void on_script_destroyed(entt::registry& reg, entt::entity e);
+
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

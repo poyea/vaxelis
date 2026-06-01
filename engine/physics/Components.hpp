@@ -18,6 +18,11 @@ struct RigidBody2D {
     float    gravity_scale{1.0f};
 
     b2BodyId body{b2_nullBodyId};
+    // Last pose Physics2D wrote to / read from the body, in pixels/radians.
+    // sync_from_scene compares the live Transform2D against these to detect
+    // external edits and avoid fighting the simulation on untouched bodies.
+    vec2     last_sync_position{0.0f, 0.0f};
+    float    last_sync_rotation{0.0f};
 };
 
 // Box-shaped collider attached to the parent entity's body. Size in pixels;

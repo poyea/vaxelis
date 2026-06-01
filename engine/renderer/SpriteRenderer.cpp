@@ -11,6 +11,36 @@ namespace vaxelis {
 
 namespace {
 
+// GLSL 4.50 core (desktop) and GLSL ES 3.00 (WebGL2/Emscripten) variants. The
+// only differences are the #version line and the fragment shader's required
+// `precision` statement — the attribute layout(location=) qualifiers, plain
+// uniforms, and unqualified varyings are all valid in both dialects.
+#ifdef __EMSCRIPTEN__
+constexpr std::string_view kVertexSrc = R"(#version 300 es
+layout(location = 0) in vec2 a_pos;
+layout(location = 1) in vec2 a_uv;
+layout(location = 2) in vec4 a_color;
+uniform mat4 u_mvp;
+out vec2 v_uv;
+out vec4 v_color;
+void main() {
+    v_uv = a_uv;
+    v_color = a_color;
+    gl_Position = u_mvp * vec4(a_pos, 0.0, 1.0);
+}
+)";
+
+constexpr std::string_view kFragmentSrc = R"(#version 300 es
+precision mediump float;
+in vec2 v_uv;
+in vec4 v_color;
+uniform sampler2D u_tex;
+out vec4 o_color;
+void main() {
+    o_color = texture(u_tex, v_uv) * v_color;
+}
+)";
+#else
 constexpr std::string_view kVertexSrc = R"(#version 450 core
 layout(location = 0) in vec2 a_pos;
 layout(location = 1) in vec2 a_uv;
@@ -34,6 +64,7 @@ void main() {
     o_color = texture(u_tex, v_uv) * v_color;
 }
 )";
+#endif
 
 }  // namespace
 

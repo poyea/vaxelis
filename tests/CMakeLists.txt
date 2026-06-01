@@ -6,7 +6,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(vaxelis_tests test_rhi.cpp test_input.cpp test_scene.cpp test_physics.cpp test_filewatcher.cpp test_tilemap.cpp test_world_transform.cpp)
+add_executable(vaxelis_tests test_rhi.cpp test_input.cpp test_scene.cpp test_physics.cpp test_filewatcher.cpp test_tilemap.cpp test_world_transform.cpp test_script.cpp)
 target_link_libraries(vaxelis_tests PRIVATE vaxelis_engine Catch2::Catch2WithMain)
 vaxelis_apply_target_options(vaxelis_tests)
 

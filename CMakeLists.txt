@@ -18,6 +18,11 @@ option(VAXELIS_BUILD_RUNTIME "Build the runtime executable" ON)
 option(VAXELIS_BUILD_TESTS "Build unit tests" ${BUILD_TESTING})
 option(VAXELIS_ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
 
+# The Catch2 host tests have no runner in the browser; force them off for web.
+if(EMSCRIPTEN)
+    set(VAXELIS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+endif()
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
     message(FATAL_ERROR "GCC 13 or newer required for C++23")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)

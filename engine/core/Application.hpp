@@ -57,6 +57,7 @@ protected:
 private:
     void shutdown_subsystems() noexcept;
     void refresh_drawable_size();
+    void step_frame();  // one iteration of the main loop (shared desktop/web)
 
     AppConfig cfg_;
     SDL_Window* window_{nullptr};

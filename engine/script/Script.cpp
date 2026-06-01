@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 
 #define SOL_ALL_SAFETIES_ON 1
 // sol2 headers contain stray UTF-8 emoji bytes that trigger MSVC C5321 under
@@ -27,10 +28,32 @@ struct ScriptHost::Impl {
     Scene*     scene{nullptr};
     Input*     input{nullptr};
     uint64_t   next_instance_id{1};
+    std::unordered_set<std::string> instances;
+    bool       lua_alive{true};
 };
 
 ScriptHost::ScriptHost()  : impl_(std::make_unique<Impl>()) {}
-ScriptHost::~ScriptHost() = default;
+ScriptHost::~ScriptHost() { impl_->lua_alive = false; }
+
+void ScriptHost::register_with(Scene& scene) {
+    scene.registry().on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
+}
+
+void ScriptHost::on_script_destroyed(entt::registry& reg, entt::entity e) {
+    // The registry can outlive the host (teardown ordering); only touch the
+    // Lua state while it's still alive.
+    if (!impl_->lua_alive) return;
+    const auto& sc = reg.get<ScriptComponent>(e);
+    if (sc.instance_key.empty()) return;
+    impl_->lua[sc.instance_key] = sol::lua_nil;  // drop the subtable -> collectable
+    impl_->instances.erase(sc.instance_key);
+}
+
+bool ScriptHost::has_instance(const std::string& instance_key) const {
+    return impl_->instances.contains(instance_key);
+}
+
+size_t ScriptHost::instance_count() const { return impl_->instances.size(); }
 
 sol::state& ScriptHost::lua() { return impl_->lua; }
 
@@ -110,6 +133,7 @@ void ScriptHost::update(float dt, Scene& scene) {
             // script with that table as its `self`/environment-lite.
             impl_->lua[sc.instance_key] = impl_->lua.create_table_with(
                 "entity_id", static_cast<uint32_t>(e));
+            impl_->instances.insert(sc.instance_key);
             sol::protected_function_result r = impl_->lua.safe_script_file(
                 sc.path, sol::script_pass_on_error);
             if (!r.valid()) {

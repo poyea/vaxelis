@@ -95,6 +95,12 @@ protected:
         input().bind_action("restart",    SDL_SCANCODE_R);
         input().bind_action("advance",    SDL_SCANCODE_RETURN);
 
+        // Load the SFX cues. Keys match the names passed to play_cue(); a
+        // missing/failed file just yields an invalid handle that play() ignores.
+        for (const char* name : {"jump", "squash", "level-complete", "death", "win-game"}) {
+            cues_[name] = audio().load("assets/audio/" + std::string(name) + ".wav");
+        }
+
         load_level(1);
         VX_INFO("Platformer: ready");
     }
@@ -410,11 +416,12 @@ private:
         play_cue("death");
     }
 
-    // M5 audio integration left as a future hook: real .wav files will go in
-    // assets/sfx/. For now cues are logged so events are visible in the console.
+    // Plays the SFX registered for `name` (loaded in on_init). Still logs the
+    // cue so events stay visible in the console; an unmapped/failed cue is a
+    // silent no-op.
     void play_cue(const char* name) {
         VX_INFO("[cue] {}", name);
-        // Optional: audio().play(assets_.get_sound(name)); — once asset cache learns sounds.
+        if (auto it = cues_.find(name); it != cues_.end()) audio().play(it->second);
     }
 
     vaxelis::SpriteBatch     batch_;
@@ -434,6 +441,7 @@ private:
     AABB                      goal_{};
 
     std::unordered_map<std::string, vaxelis::rhi::TextureHandle> procedural_;
+    std::unordered_map<std::string, vaxelis::SoundHandle>        cues_;
 };
 
 }  // namespace

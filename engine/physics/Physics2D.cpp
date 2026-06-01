@@ -98,6 +98,8 @@ void Physics2D::sync_to_scene(Scene& scene) {
             bd.motionLocks.angularZ = rb.fixed_rotation;
             bd.gravityScale   = rb.gravity_scale;
             rb.body = b2CreateBody(world_, &bd);
+            rb.last_sync_position = tr.position;
+            rb.last_sync_rotation = tr.rotation;
         }
         if (auto* col = reg.try_get<BoxCollider2D>(e)) {
             if (B2_IS_NULL(col->shape) && !B2_IS_NULL(rb.body)) {
@@ -128,6 +130,30 @@ void Physics2D::sync_to_scene(Scene& scene) {
         const b2Rot  rt = b2Body_GetRotation(rb.body);
         tr.position = { p.x * ppm_, p.y * ppm_ };
         tr.rotation = b2Rot_GetAngle(rt);
+        rb.last_sync_position = tr.position;
+        rb.last_sync_rotation = tr.rotation;
+    }
+}
+
+void Physics2D::sync_from_scene(Scene& scene) {
+    if (!b2World_IsValid(world_)) return;
+    auto& reg = scene.registry();
+    auto view = reg.view<RigidBody2D, Transform2D>();
+    for (auto e : view) {
+        auto& rb = view.get<RigidBody2D>(e);
+        auto& tr = view.get<Transform2D>(e);
+        if (B2_IS_NULL(rb.body)) continue;
+        // Skip bodies that haven't moved since our last write — comparing
+        // against the exact value we last stored makes this an equality test,
+        // not a tolerance one, so the simulation owns untouched dynamic bodies.
+        if (tr.position == rb.last_sync_position && tr.rotation == rb.last_sync_rotation)
+            continue;
+        b2Body_SetTransform(rb.body,
+                            b2Vec2{ tr.position.x * inv_ppm_, tr.position.y * inv_ppm_ },
+                            b2MakeRot(tr.rotation));
+        if (rb.type == BodyType::Dynamic) b2Body_SetAwake(rb.body, true);
+        rb.last_sync_position = tr.position;
+        rb.last_sync_rotation = tr.rotation;
     }
 }
 

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vaxelis — Platformer</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #14181f; color: #cdd6e3;
+                 font: 14px/1.4 system-ui, sans-serif; }
+    #wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 12px; }
+    canvas { background: #000; border: 1px solid #2a313c; image-rendering: pixelated; }
+    #status { opacity: .8; }
+  </style>
+</head>
+<body>
+  <div id="wrap">
+    <div id="status">loading…</div>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+  </div>
+  <script>
+    var statusEl = document.getElementById('status');
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      setStatus: function (t) { if (statusEl) statusEl.textContent = t || ''; },
+      print: function () { console.log.apply(console, arguments); },
+      printErr: function () { console.error.apply(console, arguments); },
+    };
+    Module.setStatus('Downloading…');
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

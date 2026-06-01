@@ -11,7 +11,11 @@ void ImGuiLayer::init(SDL_Window* window, void* gl_context) {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
     ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
+#ifdef __EMSCRIPTEN__
+    ImGui_ImplOpenGL3_Init("#version 300 es");  // WebGL2 / GLES 3.0
+#else
     ImGui_ImplOpenGL3_Init("#version 450");
+#endif
 }
 
 void ImGuiLayer::shutdown() {

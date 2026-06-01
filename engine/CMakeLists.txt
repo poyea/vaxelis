@@ -37,7 +37,9 @@ target_link_libraries(vaxelis_engine
         sol2
 )
 
-if(WIN32)
+if(EMSCRIPTEN)
+    # emcc provides GLES3/WebGL2 and the SDL3 port itself; no system GL lib.
+elseif(WIN32)
     target_link_libraries(vaxelis_engine PUBLIC opengl32)
 elseif(APPLE)
     target_link_libraries(vaxelis_engine PUBLIC "-framework OpenGL" "-framework CoreAudio" "-framework AudioToolbox")
