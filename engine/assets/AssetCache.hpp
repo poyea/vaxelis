@@ -17,7 +17,7 @@ class FileWatcher;
 // across reloads because we destroy the old GPU texture and replace it under
 // the same key. Listeners get notified so they can refresh dependent state.
 class AssetCache {
-public:
+  public:
     using ReloadListener = std::function<void(std::string_view key, rhi::TextureHandle)>;
 
     bool init(rhi::IDevice& device, FileWatcher* watcher = nullptr);
@@ -34,16 +34,16 @@ public:
 
     void add_listener(ReloadListener l) { listeners_.push_back(std::move(l)); }
 
-private:
+  private:
     struct TexEntry {
-        std::string        path;
+        std::string path;
         rhi::TextureHandle handle{};
     };
 
-    rhi::IDevice*  device_{nullptr};
-    FileWatcher*   watcher_{nullptr};
+    rhi::IDevice* device_{nullptr};
+    FileWatcher* watcher_{nullptr};
     std::unordered_map<std::string, TexEntry> textures_;
     std::vector<ReloadListener> listeners_;
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

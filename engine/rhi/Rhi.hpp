@@ -24,9 +24,18 @@ enum class RhiError {
 std::string_view to_string(RhiError);
 
 // Opaque handles. Trivially copyable, cheap to pass around. 0 == null.
-struct TextureHandle { uint32_t id{0}; constexpr bool valid() const { return id != 0; } };
-struct ShaderHandle  { uint32_t id{0}; constexpr bool valid() const { return id != 0; } };
-struct BufferHandle  { uint32_t id{0}; constexpr bool valid() const { return id != 0; } };
+struct TextureHandle {
+    uint32_t id{0};
+    constexpr bool valid() const { return id != 0; }
+};
+struct ShaderHandle {
+    uint32_t id{0};
+    constexpr bool valid() const { return id != 0; }
+};
+struct BufferHandle {
+    uint32_t id{0};
+    constexpr bool valid() const { return id != 0; }
+};
 
 enum class TextureFormat { RGBA8 };
 
@@ -34,7 +43,7 @@ struct TextureDesc {
     uint32_t width{0};
     uint32_t height{0};
     TextureFormat format{TextureFormat::RGBA8};
-    const void* initial_data{nullptr};  // tightly packed; size = width*height*bpp
+    const void* initial_data{nullptr}; // tightly packed; size = width*height*bpp
 };
 
 enum class BufferUsage { Vertex, Index, Uniform };
@@ -53,18 +62,19 @@ struct ShaderDesc {
 };
 
 class IDevice {
-public:
+  public:
     virtual ~IDevice() = default;
 
     virtual vaxelis::expected<TextureHandle, RhiError> create_texture(const TextureDesc&) = 0;
-    virtual vaxelis::expected<ShaderHandle, RhiError>  create_shader(const ShaderDesc&) = 0;
-    virtual vaxelis::expected<BufferHandle, RhiError>  create_buffer(const BufferDesc&) = 0;
+    virtual vaxelis::expected<ShaderHandle, RhiError> create_shader(const ShaderDesc&) = 0;
+    virtual vaxelis::expected<BufferHandle, RhiError> create_buffer(const BufferDesc&) = 0;
 
     virtual void destroy(TextureHandle) = 0;
     virtual void destroy(ShaderHandle) = 0;
     virtual void destroy(BufferHandle) = 0;
 
-    virtual void update_buffer(BufferHandle, std::span<const std::byte> data, size_t offset_bytes = 0) = 0;
+    virtual void update_buffer(BufferHandle, std::span<const std::byte> data,
+                               size_t offset_bytes = 0) = 0;
 
     virtual void begin_frame(vec4 clear_color, uint32_t fb_width, uint32_t fb_height) = 0;
     virtual void end_frame() = 0;
@@ -87,4 +97,4 @@ static_assert(std::is_trivially_copyable_v<TextureHandle>);
 static_assert(std::is_trivially_copyable_v<ShaderHandle>);
 static_assert(std::is_trivially_copyable_v<BufferHandle>);
 
-}  // namespace vaxelis::rhi
+} // namespace vaxelis::rhi

@@ -17,12 +17,12 @@ class SpriteBatch;
 // nodes. Hierarchy edits go through the helpers below so parent/child stay in
 // sync; touching the registry directly skips those invariants.
 class Scene {
-public:
+  public:
     Scene();
 
-    entt::registry&       registry()       { return registry_; }
+    entt::registry& registry() { return registry_; }
     const entt::registry& registry() const { return registry_; }
-    entt::entity          root() const     { return root_; }
+    entt::entity root() const { return root_; }
 
     // Creates a node with a Name + Hierarchy + Transform2D. Parent defaults
     // to root. Caller adds extra components via registry().emplace<>.
@@ -54,12 +54,12 @@ public:
     // with !texture.valid() are skipped (texture resolution is the host's job).
     void render_sprites(SpriteBatch& batch) const;
 
-private:
+  private:
     void destroy_recursive(entt::entity e);
     void detach_from_parent(entt::entity e);
 
     entt::registry registry_;
-    entt::entity   root_{entt::null};
+    entt::entity root_{entt::null};
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

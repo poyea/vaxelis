@@ -8,7 +8,9 @@
 #include <entt/entt.hpp>
 
 // Forward-declare sol::state to keep sol's heavy headers out of clients.
-namespace sol { class state; }
+namespace sol {
+class state;
+}
 
 namespace vaxelis {
 
@@ -22,11 +24,11 @@ class Input;
 // file). Each script runs in its own Lua subtable namespace so globals don't
 // collide; the table exposes `entity_id` plus any callbacks the script defines.
 class ScriptHost {
-public:
+  public:
     ScriptHost();
     ~ScriptHost();
 
-    ScriptHost(const ScriptHost&)            = delete;
+    ScriptHost(const ScriptHost&) = delete;
     ScriptHost& operator=(const ScriptHost&) = delete;
 
     // Binds engine API (vec2, scene helpers, input queries) into the Lua state.
@@ -46,10 +48,10 @@ public:
     sol::state& lua();
 
     // True while the host still holds a live Lua subtable for `instance_key`.
-    bool   has_instance(const std::string& instance_key) const;
+    bool has_instance(const std::string& instance_key) const;
     size_t instance_count() const;
 
-private:
+  private:
     void on_script_destroyed(entt::registry& reg, entt::entity e);
 
     struct Impl;
@@ -60,8 +62,8 @@ private:
 // host has bound it. `instance_key` is the Lua subtable name (auto-assigned).
 struct ScriptComponent {
     std::string path;
-    bool        loaded{false};
+    bool loaded{false};
     std::string instance_key;
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

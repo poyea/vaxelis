@@ -27,7 +27,7 @@ struct AppConfig {
 // `init()` to spin up SDL/GL/RHI/ImGui — it returns false on failure with the
 // reason logged. `run()` returns non-zero if init failed.
 class Application {
-public:
+  public:
     explicit Application(AppConfig cfg) noexcept;
     virtual ~Application();
 
@@ -35,37 +35,37 @@ public:
     Application& operator=(const Application&) = delete;
 
     [[nodiscard]] bool init();
-    int run();  // returns process exit code
+    int run(); // returns process exit code
 
-protected:
-    virtual void on_init()                                  {}
-    virtual void on_fixed_update(float /*fixed_dt*/)        {}  // deterministic, called 0..N times/frame
-    virtual void on_update(float /*frame_dt*/)              {}  // variable, once per frame
-    virtual void on_render()                                {}
-    virtual void on_imgui()                                 {}
-    virtual void on_shutdown()                              {}
+  protected:
+    virtual void on_init() {}
+    virtual void on_fixed_update(float /*fixed_dt*/) {} // deterministic, called 0..N times/frame
+    virtual void on_update(float /*frame_dt*/) {}       // variable, once per frame
+    virtual void on_render() {}
+    virtual void on_imgui() {}
+    virtual void on_shutdown() {}
 
-    rhi::IDevice&  device()         { return *device_; }
-    Input&         input()          { return input_; }
-    Audio&         audio()          { return audio_; }
-    uint32_t       width()    const { return fb_width_; }
-    uint32_t       height()   const { return fb_height_; }
-    vec4&          clear_color()    { return clear_color_; }
+    rhi::IDevice& device() { return *device_; }
+    Input& input() { return input_; }
+    Audio& audio() { return audio_; }
+    uint32_t width() const { return fb_width_; }
+    uint32_t height() const { return fb_height_; }
+    vec4& clear_color() { return clear_color_; }
 
     static constexpr float kFixedDt = 1.0f / 60.0f;
 
-private:
+  private:
     void shutdown_subsystems() noexcept;
     void refresh_drawable_size();
-    void step_frame();  // one iteration of the main loop (shared desktop/web)
+    void step_frame(); // one iteration of the main loop (shared desktop/web)
 
     AppConfig cfg_;
     SDL_Window* window_{nullptr};
     void* gl_ctx_{nullptr};
     std::unique_ptr<rhi::IDevice> device_;
     ImGuiLayer imgui_;
-    Input  input_;
-    Audio  audio_;
+    Input input_;
+    Audio audio_;
     bool imgui_inited_{false};
     bool audio_inited_{false};
     Clock clock_;
@@ -77,4 +77,4 @@ private:
     bool inited_{false};
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

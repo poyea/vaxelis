@@ -14,11 +14,11 @@ class Scene;
 // Box2D v3 world wrapper. World units = meters; converts to/from pixels via
 // `pixels_per_meter`. Step at a fixed dt (driven by Application's accumulator).
 class Physics2D {
-public:
+  public:
     struct Config {
-        vec2  gravity{0.0f, 980.0f};   // pixels/sec^2 (down = +Y, matches screen-space)
+        vec2 gravity{0.0f, 980.0f}; // pixels/sec^2 (down = +Y, matches screen-space)
         float pixels_per_meter{100.0f};
-        int   sub_steps{4};
+        int sub_steps{4};
     };
 
     bool init();
@@ -50,14 +50,14 @@ public:
     float pixels_per_meter() const { return ppm_; }
     b2WorldId world() const { return world_; }
 
-private:
+  private:
     void on_rb_destroyed(entt::registry& reg, entt::entity e);
     void on_col_destroyed(entt::registry& reg, entt::entity e);
 
     b2WorldId world_{b2_nullWorldId};
-    Config    cfg_{};
-    float     ppm_{100.0f};
-    float     inv_ppm_{0.01f};
+    Config cfg_{};
+    float ppm_{100.0f};
+    float inv_ppm_{0.01f};
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

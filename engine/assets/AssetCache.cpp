@@ -31,16 +31,17 @@ LoadedImage load_rgba8(const std::string& path) {
         VX_ERROR("AssetCache: stbi_load failed for {}: {}", path, stbi_failure_reason());
         return out;
     }
-    out.w = w; out.h = h;
+    out.w = w;
+    out.h = h;
     out.px.assign(data, data + static_cast<size_t>(w) * h * 4);
     stbi_image_free(data);
     return out;
 }
 
-}  // namespace
+} // namespace
 
 bool AssetCache::init(rhi::IDevice& device, FileWatcher* watcher) {
-    device_  = &device;
+    device_ = &device;
     watcher_ = watcher;
     return true;
 }
@@ -48,7 +49,8 @@ bool AssetCache::init(rhi::IDevice& device, FileWatcher* watcher) {
 void AssetCache::shutdown() {
     if (device_) {
         for (auto& [_, t] : textures_) {
-            if (t.handle.valid()) device_->destroy(t.handle);
+            if (t.handle.valid())
+                device_->destroy(t.handle);
         }
     }
     textures_.clear();
@@ -58,12 +60,15 @@ void AssetCache::shutdown() {
 }
 
 rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_view key) {
-    if (!device_) return {};
+    if (!device_)
+        return {};
     const std::string k = key.empty() ? std::string(path) : std::string(key);
-    if (auto it = textures_.find(k); it != textures_.end()) return it->second.handle;
+    if (auto it = textures_.find(k); it != textures_.end())
+        return it->second.handle;
 
     auto img = load_rgba8(std::string(path));
-    if (img.px.empty()) return {};
+    if (img.px.empty())
+        return {};
 
     rhi::TextureDesc td{
         .width = static_cast<uint32_t>(img.w),
@@ -72,15 +77,15 @@ rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_v
         .initial_data = img.px.data(),
     };
     auto tex = device_->create_texture(td);
-    if (!tex) return {};
+    if (!tex)
+        return {};
 
     TexEntry e{std::string(path), *tex};
     auto [it, _] = textures_.emplace(k, std::move(e));
     if (watcher_) {
         std::string key_copy = k;
-        watcher_->watch(it->second.path, [this, key_copy](const std::string&) {
-            reload_texture(key_copy);
-        });
+        watcher_->watch(it->second.path,
+                        [this, key_copy](const std::string&) { reload_texture(key_copy); });
     }
     return it->second.handle;
 }
@@ -91,16 +96,20 @@ rhi::TextureHandle AssetCache::get_texture(std::string_view key) const {
 }
 
 void AssetCache::reload_texture(std::string_view key) {
-    if (!device_) return;
+    if (!device_)
+        return;
     auto it = textures_.find(std::string(key));
-    if (it == textures_.end()) return;
+    if (it == textures_.end())
+        return;
 
     auto img = load_rgba8(it->second.path);
-    if (img.px.empty()) return;
+    if (img.px.empty())
+        return;
 
     // No in-place texture update in the RHI yet; destroy + recreate. The
     // listener fan-out lets clients rebind the new handle.
-    if (it->second.handle.valid()) device_->destroy(it->second.handle);
+    if (it->second.handle.valid())
+        device_->destroy(it->second.handle);
     rhi::TextureDesc td{
         .width = static_cast<uint32_t>(img.w),
         .height = static_cast<uint32_t>(img.h),
@@ -108,10 +117,14 @@ void AssetCache::reload_texture(std::string_view key) {
         .initial_data = img.px.data(),
     };
     auto tex = device_->create_texture(td);
-    if (!tex) { it->second.handle = {}; return; }
+    if (!tex) {
+        it->second.handle = {};
+        return;
+    }
     it->second.handle = *tex;
     VX_INFO("AssetCache: reloaded texture '{}'", it->first);
-    for (auto& l : listeners_) l(it->first, it->second.handle);
+    for (auto& l : listeners_)
+        l(it->first, it->second.handle);
 }
 
-}  // namespace vaxelis
+} // namespace vaxelis

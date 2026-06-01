@@ -23,4 +23,4 @@ struct AABB2 {
     vec2 max;
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

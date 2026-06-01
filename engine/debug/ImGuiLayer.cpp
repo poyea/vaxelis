@@ -1,8 +1,8 @@
 #include "engine/debug/ImGuiLayer.hpp"
 
-#include <imgui.h>
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
+#include <imgui.h>
 
 namespace vaxelis {
 
@@ -12,7 +12,7 @@ void ImGuiLayer::init(SDL_Window* window, void* gl_context) {
     ImGui::StyleColorsDark();
     ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
 #ifdef __EMSCRIPTEN__
-    ImGui_ImplOpenGL3_Init("#version 300 es");  // WebGL2 / GLES 3.0
+    ImGui_ImplOpenGL3_Init("#version 300 es"); // WebGL2 / GLES 3.0
 #else
     ImGui_ImplOpenGL3_Init("#version 450");
 #endif
@@ -39,4 +39,4 @@ void ImGuiLayer::end_frame() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
-}  // namespace vaxelis
+} // namespace vaxelis

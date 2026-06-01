@@ -26,32 +26,34 @@ const TilesetRef* find_tileset_for_gid(const TiledMap& m, uint32_t gid) {
     return best;
 }
 
-}  // namespace
+} // namespace
 
 bool load_string(TiledMap& out, std::string_view jtext, const ImageResolver& resolver) {
     json j;
-    try { j = json::parse(jtext); }
-    catch (const std::exception& e) {
+    try {
+        j = json::parse(jtext);
+    } catch (const std::exception& e) {
         VX_ERROR("TiledMap: JSON parse failed: {}", e.what());
         return false;
     }
 
     out = {};
-    out.tile_w = j.value("tilewidth",  16);
+    out.tile_w = j.value("tilewidth", 16);
     out.tile_h = j.value("tileheight", 16);
-    out.width  = j.value("width",  0);
+    out.width = j.value("width", 0);
     out.height = j.value("height", 0);
 
     for (const auto& ts : j.value("tilesets", json::array())) {
         TilesetRef t;
         t.first_gid = ts.value("firstgid", 1u);
-        t.image     = ts.value("image", std::string{});
-        t.tile_w    = ts.value("tilewidth",  out.tile_w);
-        t.tile_h    = ts.value("tileheight", out.tile_h);
-        t.columns   = ts.value("columns", 1);
-        t.image_w   = ts.value("imagewidth",  0);
-        t.image_h   = ts.value("imageheight", 0);
-        if (resolver && !t.image.empty()) t.texture = resolver(t.image);
+        t.image = ts.value("image", std::string{});
+        t.tile_w = ts.value("tilewidth", out.tile_w);
+        t.tile_h = ts.value("tileheight", out.tile_h);
+        t.columns = ts.value("columns", 1);
+        t.image_w = ts.value("imagewidth", 0);
+        t.image_h = ts.value("imageheight", 0);
+        if (resolver && !t.image.empty())
+            t.texture = resolver(t.image);
         out.tilesets.push_back(std::move(t));
     }
 
@@ -59,13 +61,14 @@ bool load_string(TiledMap& out, std::string_view jtext, const ImageResolver& res
         const std::string type = layer.value("type", std::string{});
         if (type == "tilelayer") {
             TileLayer L;
-            L.name    = layer.value("name", std::string{});
-            L.width   = layer.value("width",  0);
-            L.height  = layer.value("height", 0);
+            L.name = layer.value("name", std::string{});
+            L.width = layer.value("width", 0);
+            L.height = layer.value("height", 0);
             L.visible = layer.value("visible", true);
             const auto& data = layer.value("data", json::array());
             L.gids.reserve(data.size());
-            for (const auto& v : data) L.gids.push_back(v.get<uint32_t>() & kFlipMask);
+            for (const auto& v : data)
+                L.gids.push_back(v.get<uint32_t>() & kFlipMask);
             out.tile_layers.push_back(std::move(L));
         } else if (type == "objectgroup") {
             ObjectGroup g;
@@ -74,8 +77,8 @@ bool load_string(TiledMap& out, std::string_view jtext, const ImageResolver& res
                 MapObject m;
                 m.name = o.value("name", std::string{});
                 m.type = o.value("type", std::string{});
-                m.pos  = { o.value("x", 0.0f), o.value("y", 0.0f) };
-                m.size = { o.value("width", 0.0f), o.value("height", 0.0f) };
+                m.pos = {o.value("x", 0.0f), o.value("y", 0.0f)};
+                m.size = {o.value("width", 0.0f), o.value("height", 0.0f)};
                 g.objects.push_back(std::move(m));
             }
             out.object_groups.push_back(std::move(g));
@@ -86,20 +89,27 @@ bool load_string(TiledMap& out, std::string_view jtext, const ImageResolver& res
 
 bool load_file(TiledMap& out, std::string_view path, const ImageResolver& resolver) {
     std::ifstream f((std::string(path)));
-    if (!f) { VX_ERROR("TiledMap: cannot open {}", path); return false; }
-    std::stringstream ss; ss << f.rdbuf();
+    if (!f) {
+        VX_ERROR("TiledMap: cannot open {}", path);
+        return false;
+    }
+    std::stringstream ss;
+    ss << f.rdbuf();
     return load_string(out, ss.str(), resolver);
 }
 
 void render(const TiledMap& m, SpriteBatch& batch) {
     for (const auto& layer : m.tile_layers) {
-        if (!layer.visible) continue;
+        if (!layer.visible)
+            continue;
         for (int y = 0; y < layer.height; ++y) {
             for (int x = 0; x < layer.width; ++x) {
                 const uint32_t gid = layer.gids[static_cast<size_t>(y) * layer.width + x];
-                if (gid == 0) continue;
+                if (gid == 0)
+                    continue;
                 const auto* ts = find_tileset_for_gid(m, gid);
-                if (!ts || !ts->texture.valid() || ts->columns <= 0) continue;
+                if (!ts || !ts->texture.valid() || ts->columns <= 0)
+                    continue;
                 const uint32_t local = gid - ts->first_gid;
                 const int col = static_cast<int>(local % ts->columns);
                 const int row = static_cast<int>(local / ts->columns);
@@ -111,14 +121,13 @@ void render(const TiledMap& m, SpriteBatch& batch) {
                     (x + 0.5f) * m.tile_w,
                     (y + 0.5f) * m.tile_h,
                 };
-                const vec2 size{ static_cast<float>(m.tile_w), static_cast<float>(m.tile_h) };
+                const vec2 size{static_cast<float>(m.tile_w), static_cast<float>(m.tile_h)};
                 // SpriteBatch writes uv_rect.w to the top-screen vertex, so
                 // pass v_bottom in .y and v_top in .w.
-                batch.draw(ts->texture, pos, size,
-                           vec4{u0, v1, u1, v0}, vec4{1.0f});
+                batch.draw(ts->texture, pos, size, vec4{u0, v1, u1, v0}, vec4{1.0f});
             }
         }
     }
 }
 
-}  // namespace vaxelis::tiled
+} // namespace vaxelis::tiled

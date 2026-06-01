@@ -66,19 +66,25 @@ void main() {
 )";
 #endif
 
-}  // namespace
+} // namespace
 
 bool SpriteBatch::init(rhi::IDevice& device, uint32_t max_quads) {
     max_quads_ = max_quads;
     verts_.reserve(static_cast<size_t>(max_quads_) * 4);
 
     auto sh = device.create_shader({kVertexSrc, kFragmentSrc});
-    if (!sh) { VX_ERROR("SpriteBatch: shader create failed ({})", rhi::to_string(sh.error())); return false; }
+    if (!sh) {
+        VX_ERROR("SpriteBatch: shader create failed ({})", rhi::to_string(sh.error()));
+        return false;
+    }
     shader_ = *sh;
 
     auto vb = device.create_buffer({rhi::BufferUsage::Vertex, rhi::BufferAccess::Dynamic,
                                     sizeof(Vertex) * max_quads_ * 4, nullptr});
-    if (!vb) { device.destroy(shader_); return false; }
+    if (!vb) {
+        device.destroy(shader_);
+        return false;
+    }
     vb_ = *vb;
 
     // Pre-build the index buffer: each quad is 6 indices (two triangles) in a
@@ -87,7 +93,7 @@ bool SpriteBatch::init(rhi::IDevice& device, uint32_t max_quads) {
     std::vector<uint16_t> indices(static_cast<size_t>(max_quads_) * 6);
     for (uint32_t q = 0; q < max_quads_; ++q) {
         const uint16_t base = static_cast<uint16_t>(q * 4);
-        const size_t   i    = static_cast<size_t>(q) * 6;
+        const size_t i = static_cast<size_t>(q) * 6;
         indices[i + 0] = base + 0;
         indices[i + 1] = base + 1;
         indices[i + 2] = base + 2;
@@ -97,29 +103,38 @@ bool SpriteBatch::init(rhi::IDevice& device, uint32_t max_quads) {
     }
     auto ib = device.create_buffer({rhi::BufferUsage::Index, rhi::BufferAccess::Static,
                                     indices.size() * sizeof(uint16_t), indices.data()});
-    if (!ib) { device.destroy(shader_); device.destroy(vb_); return false; }
+    if (!ib) {
+        device.destroy(shader_);
+        device.destroy(vb_);
+        return false;
+    }
     ib_ = *ib;
     return true;
 }
 
 void SpriteBatch::shutdown(rhi::IDevice& device) {
-    if (ib_.valid())     device.destroy(ib_);
-    if (vb_.valid())     device.destroy(vb_);
-    if (shader_.valid()) device.destroy(shader_);
-    ib_ = {}; vb_ = {}; shader_ = {};
+    if (ib_.valid())
+        device.destroy(ib_);
+    if (vb_.valid())
+        device.destroy(vb_);
+    if (shader_.valid())
+        device.destroy(shader_);
+    ib_ = {};
+    vb_ = {};
+    shader_ = {};
     verts_.clear();
     device_ = nullptr;
 }
 
 void SpriteBatch::begin(rhi::IDevice& device, uint32_t screen_w, uint32_t screen_h) {
-    begin(device, glm::ortho(0.0f, static_cast<float>(screen_w),
-                             static_cast<float>(screen_h), 0.0f, -1.0f, 1.0f));
+    begin(device, glm::ortho(0.0f, static_cast<float>(screen_w), static_cast<float>(screen_h), 0.0f,
+                             -1.0f, 1.0f));
 }
 
 void SpriteBatch::begin(rhi::IDevice& device, const mat4& projection) {
     assert(!in_frame_ && "SpriteBatch::begin called twice without end");
     device_ = &device;
-    proj_   = projection;
+    proj_ = projection;
     current_tex_ = {};
     verts_.clear();
     draw_calls_ = 0;
@@ -139,10 +154,10 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 color) 
     draw(tex, pos, size, vec4(0.0f, 0.0f, 1.0f, 1.0f), color);
 }
 
-void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size,
-                       vec4 uv_rect, vec4 color) {
+void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect, vec4 color) {
     assert(in_frame_ && "SpriteBatch::draw outside begin/end");
-    if (!tex.valid()) return;
+    if (!tex.valid())
+        return;
 
     // Flush on texture change or when the per-batch cap is hit.
     if (current_tex_.id != tex.id || verts_.size() / 4 >= max_quads_) {
@@ -167,14 +182,15 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size,
 }
 
 void SpriteBatch::flush() {
-    if (verts_.empty() || !current_tex_.valid()) return;
+    if (verts_.empty() || !current_tex_.valid())
+        return;
     const auto byte_count = verts_.size() * sizeof(Vertex);
     device_->update_buffer(vb_, std::span<const std::byte>(
-        reinterpret_cast<const std::byte*>(verts_.data()), byte_count));
+                                    reinterpret_cast<const std::byte*>(verts_.data()), byte_count));
     const uint32_t index_count = static_cast<uint32_t>(verts_.size() / 4) * 6;
     device_->draw_sprite_batch(shader_, vb_, ib_, index_count, current_tex_, proj_);
     ++draw_calls_;
     verts_.clear();
 }
 
-}  // namespace vaxelis
+} // namespace vaxelis

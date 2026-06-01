@@ -6,4 +6,4 @@ vaxelis::expected<std::unique_ptr<IDevice>, RhiError> create_vk_device() {
     return vaxelis::unexpected(RhiError::BackendUnavailable);
 }
 
-}  // namespace vaxelis::rhi::vk
+} // namespace vaxelis::rhi::vk

@@ -12,4 +12,4 @@ void init_logging() {
     spdlog::set_default_logger(logger);
 }
 
-}  // namespace vaxelis
+} // namespace vaxelis

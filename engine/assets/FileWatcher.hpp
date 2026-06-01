@@ -15,7 +15,7 @@ namespace vaxelis {
 // Designed for editor/dev use — not for production hot paths. Default tick
 // interval is 250ms; call tick(dt) every frame.
 class FileWatcher {
-public:
+  public:
     using Callback = std::function<void(const std::string& path)>;
 
     void watch(std::string path, Callback cb);
@@ -26,15 +26,15 @@ public:
 
     void set_interval(float seconds) { interval_ = seconds; }
 
-private:
+  private:
     struct Entry {
         Callback cb;
         std::filesystem::file_time_type mtime{};
-        bool      seen{false};
+        bool seen{false};
     };
     std::unordered_map<std::string, Entry> entries_;
     float accumulator_{0.0f};
     float interval_{0.25f};
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

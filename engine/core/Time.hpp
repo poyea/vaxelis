@@ -5,7 +5,7 @@
 namespace vaxelis {
 
 class Clock {
-public:
+  public:
     using clock = std::chrono::steady_clock;
 
     Clock() : start_(clock::now()), last_(start_) {}
@@ -23,9 +23,9 @@ public:
         return e.count();
     }
 
-private:
+  private:
     clock::time_point start_;
     clock::time_point last_;
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

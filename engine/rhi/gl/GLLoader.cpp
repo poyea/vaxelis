@@ -8,10 +8,9 @@ namespace vaxelis::rhi::gl {
 
 namespace {
 GLApi g_api{};
-bool  g_loaded = false;
+bool g_loaded = false;
 
-template <typename Fn>
-bool load_one(Fn& slot, const char* name) {
+template <typename Fn> bool load_one(Fn& slot, const char* name) {
     auto ptr = SDL_GL_GetProcAddress(name);
     if (!ptr) {
         VX_ERROR("GL: failed to load {}", name);
@@ -19,16 +18,19 @@ bool load_one(Fn& slot, const char* name) {
     }
     // Cast through a generic function-pointer type to silence MSVC C4191 and
     // avoid object-pointer ↔ function-pointer conversion.
-    using generic_fn = void(*)();
+    using generic_fn = void (*)();
     slot = reinterpret_cast<Fn>(reinterpret_cast<generic_fn>(ptr));
     return true;
 }
-}  // namespace
+} // namespace
 
-const GLApi& gl() { return g_api; }
+const GLApi& gl() {
+    return g_api;
+}
 
 bool load_gl() {
-    if (g_loaded) return true;
+    if (g_loaded)
+        return true;
     bool ok = true;
 #define VX_LOAD(name) ok &= load_one(g_api.name, "gl" #name)
     VX_LOAD(Clear);
@@ -76,4 +78,4 @@ bool load_gl() {
     return ok;
 }
 
-}  // namespace vaxelis::rhi::gl
+} // namespace vaxelis::rhi::gl

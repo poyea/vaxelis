@@ -11,9 +11,12 @@
 
 namespace vaxelis {
 
-Application::Application(AppConfig cfg) noexcept : cfg_(std::move(cfg)) {}
+Application::Application(AppConfig cfg) noexcept : cfg_(std::move(cfg)) {
+}
 
-Application::~Application() { shutdown_subsystems(); }
+Application::~Application() {
+    shutdown_subsystems();
+}
 
 bool Application::init() {
     init_logging();
@@ -35,10 +38,9 @@ bool Application::init() {
 #endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    window_ = SDL_CreateWindow(cfg_.title.c_str(),
-                               static_cast<int>(cfg_.width),
-                               static_cast<int>(cfg_.height),
-                               SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    window_ = SDL_CreateWindow(
+        cfg_.title.c_str(), static_cast<int>(cfg_.width), static_cast<int>(cfg_.height),
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window_) {
         VX_ERROR("SDL_CreateWindow failed: {}", SDL_GetError());
         return false;
@@ -74,18 +76,30 @@ bool Application::init() {
 }
 
 void Application::shutdown_subsystems() noexcept {
-    if (audio_inited_) { audio_.shutdown(); audio_inited_ = false; }
-    if (imgui_inited_) { imgui_.shutdown(); imgui_inited_ = false; }
+    if (audio_inited_) {
+        audio_.shutdown();
+        audio_inited_ = false;
+    }
+    if (imgui_inited_) {
+        imgui_.shutdown();
+        imgui_inited_ = false;
+    }
     device_.reset();
-    if (gl_ctx_) { SDL_GL_DestroyContext(static_cast<SDL_GLContext>(gl_ctx_)); gl_ctx_ = nullptr; }
-    if (window_) { SDL_DestroyWindow(window_); window_ = nullptr; }
+    if (gl_ctx_) {
+        SDL_GL_DestroyContext(static_cast<SDL_GLContext>(gl_ctx_));
+        gl_ctx_ = nullptr;
+    }
+    if (window_) {
+        SDL_DestroyWindow(window_);
+        window_ = nullptr;
+    }
     SDL_Quit();
 }
 
 void Application::refresh_drawable_size() {
     int w = 0, h = 0;
     SDL_GetWindowSizeInPixels(window_, &w, &h);
-    fb_width_  = static_cast<uint32_t>(w);
+    fb_width_ = static_cast<uint32_t>(w);
     fb_height_ = static_cast<uint32_t>(h);
 }
 
@@ -96,17 +110,19 @@ void Application::step_frame() {
     while (SDL_PollEvent(&ev)) {
         imgui_.process_event(ev);
         input_.on_event(ev);
-        if (ev.type == SDL_EVENT_QUIT) running_ = false;
-        if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE) running_ = false;
-        if (ev.type == SDL_EVENT_WINDOW_RESIZED ||
-            ev.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
+        if (ev.type == SDL_EVENT_QUIT)
+            running_ = false;
+        if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE)
+            running_ = false;
+        if (ev.type == SDL_EVENT_WINDOW_RESIZED || ev.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
             refresh_drawable_size();
         }
     }
 
     float frame_dt = clock_.tick();
     // Clamp absurd deltas (paused under debugger) to avoid huge accumulator.
-    if (frame_dt > 0.25f) frame_dt = 0.25f;
+    if (frame_dt > 0.25f)
+        frame_dt = 0.25f;
 
     // Fixed-timestep with accumulator. Caps catch-up steps so a long pause
     // (debugger break, alt-tab) doesn't trigger the spiral of death.
@@ -118,7 +134,8 @@ void Application::step_frame() {
         accumulator_ -= kFixedDt;
         ++steps;
     }
-    if (steps == kMaxStepsPerFrame) accumulator_ = 0.0;  // drop residual on overrun
+    if (steps == kMaxStepsPerFrame)
+        accumulator_ = 0.0; // drop residual on overrun
     on_update(frame_dt);
 
     device_->begin_frame(clear_color_, fb_width_, fb_height_);
@@ -139,16 +156,15 @@ int Application::run() {
     }
 
     on_init();
-    clock_.tick();  // discard the construction-to-first-frame delta
+    clock_.tick(); // discard the construction-to-first-frame delta
 
 #ifdef __EMSCRIPTEN__
     // The browser drives the loop via requestAnimationFrame; a blocking while
     // would starve it. simulate_infinite_loop=true unwinds the C++ stack, so
     // code after this never runs and on_shutdown() is left to page teardown.
-    emscripten_set_main_loop_arg(
-        [](void* self) { static_cast<Application*>(self)->step_frame(); },
-        this, 0, /*simulate_infinite_loop=*/true);
-    return 0;  // not reached
+    emscripten_set_main_loop_arg([](void* self) { static_cast<Application*>(self)->step_frame(); },
+                                 this, 0, /*simulate_infinite_loop=*/true);
+    return 0; // not reached
 #else
     while (running_) {
         step_frame();
@@ -158,4 +174,4 @@ int Application::run() {
 #endif
 }
 
-}  // namespace vaxelis
+} // namespace vaxelis

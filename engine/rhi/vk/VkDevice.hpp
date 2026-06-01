@@ -9,4 +9,4 @@ namespace vaxelis::rhi::vk {
 // assert the expected error.
 vaxelis::expected<std::unique_ptr<IDevice>, RhiError> create_vk_device();
 
-}  // namespace vaxelis::rhi::vk
+} // namespace vaxelis::rhi::vk

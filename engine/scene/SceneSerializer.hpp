@@ -19,11 +19,11 @@ class Scene;
 namespace scene_io {
 
 std::string to_json(const Scene&, int indent = 2);
-bool        from_json(Scene&, std::string_view json);  // appends under root_
+bool from_json(Scene&, std::string_view json); // appends under root_
 
-bool        save_file(const Scene&, std::string_view path);
-bool        load_file(Scene&, std::string_view path);
+bool save_file(const Scene&, std::string_view path);
+bool load_file(Scene&, std::string_view path);
 
-}  // namespace scene_io
+} // namespace scene_io
 
-}  // namespace vaxelis
+} // namespace vaxelis

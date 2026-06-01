@@ -15,7 +15,7 @@ namespace vaxelis {
 //   batch.draw(tex2, ...);
 //   batch.end();
 class SpriteBatch {
-public:
+  public:
     static constexpr uint32_t kDefaultMaxQuads = 4096;
 
     bool init(rhi::IDevice& device, uint32_t max_quads = kDefaultMaxQuads);
@@ -29,16 +29,15 @@ public:
     void end();
 
     // Centered quad. `uv` defaults to full texture (0,0)-(1,1).
-    void draw(rhi::TextureHandle, vec2 pos, vec2 size,
-              vec4 color = vec4(1.0f));
+    void draw(rhi::TextureHandle, vec2 pos, vec2 size, vec4 color = vec4(1.0f));
     void draw(rhi::TextureHandle, vec2 pos, vec2 size,
               vec4 uv_rect /* min_u, min_v, max_u, max_v */, vec4 color);
 
     // Stats from the most recently ended frame.
     uint32_t draw_calls() const { return last_draw_calls_; }
-    uint32_t quads()      const { return last_quads_; }
+    uint32_t quads() const { return last_quads_; }
 
-private:
+  private:
     struct Vertex {
         float x, y;
         float u, v;
@@ -47,11 +46,11 @@ private:
 
     void flush();
 
-    rhi::IDevice*     device_{nullptr};
+    rhi::IDevice* device_{nullptr};
     rhi::ShaderHandle shader_{};
     rhi::BufferHandle vb_{};
     rhi::BufferHandle ib_{};
-    uint32_t          max_quads_{0};
+    uint32_t max_quads_{0};
     std::vector<Vertex> verts_;
     rhi::TextureHandle current_tex_{};
     mat4 proj_{1.0f};
@@ -63,4 +62,4 @@ private:
     uint32_t last_quads_{0};
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis

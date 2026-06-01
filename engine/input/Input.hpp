@@ -19,7 +19,7 @@ namespace vaxelis {
 // against the live state mutated by on_event(), so they're stable across all
 // queries within a single frame.
 class Input {
-public:
+  public:
     void begin_frame();
     void on_event(const SDL_Event& ev);
 
@@ -30,18 +30,20 @@ public:
 
     // Raw key queries (scancode-based).
     bool down(SDL_Scancode) const;
-    bool pressed(SDL_Scancode) const;   // went down this frame
-    bool released(SDL_Scancode) const;  // went up this frame
+    bool pressed(SDL_Scancode) const;  // went down this frame
+    bool released(SDL_Scancode) const; // went up this frame
 
     // Named-action queries.
     bool down(std::string_view name) const;
     bool pressed(std::string_view name) const;
     bool released(std::string_view name) const;
 
-private:
+  private:
     static constexpr size_t kNumKeys = SDL_SCANCODE_COUNT;
 
-    struct Binding { std::vector<SDL_Scancode> keys; };
+    struct Binding {
+        std::vector<SDL_Scancode> keys;
+    };
 
     // String map; small N (handful of actions). Linear-scan lookup keeps the
     // hot query path heterogeneous-friendly without a C++23 transparent hash.
@@ -50,4 +52,4 @@ private:
     std::array<bool, kNumKeys> prev_{};
 };
 
-}  // namespace vaxelis
+} // namespace vaxelis
