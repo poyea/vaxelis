@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-mapfile -t files < <(find include src tests benchmarks -type f \( -name '*.hpp' -o -name '*.h' -o -name '*.cpp' \) | sort)
+mapfile -t files < <(find engine runtime tests -type f \( -name '*.hpp' -o -name '*.h' -o -name '*.cpp' \) | sort)
 
 if [[ ${#files[@]} -eq 0 ]]; then
     exit 0

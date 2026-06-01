@@ -5,9 +5,9 @@
 #include <string>
 
 #include "engine/input/Input.hpp"
-#include "engine/script/Script.hpp"
 #include "engine/scene/Components.hpp"
 #include "engine/scene/Scene.hpp"
+#include "engine/script/Script.hpp"
 
 using namespace vaxelis;
 
@@ -15,14 +15,14 @@ namespace {
 // Writes a tiny script (defines on_update so the host binds an instance table)
 // to a uniquely-named file under the temp dir and returns its path.
 std::string write_temp_script(const char* tag) {
-    const auto path = std::filesystem::temp_directory_path() /
-                      ("vaxelis_test_" + std::string(tag) + ".lua");
+    const auto path =
+        std::filesystem::temp_directory_path() / ("vaxelis_test_" + std::string(tag) + ".lua");
     std::ofstream f(path);
     f << "function on_update(dt) end\n";
     f.close();
     return path.string();
 }
-}  // namespace
+} // namespace
 
 TEST_CASE("ScriptHost: destroying an entity tears down its Lua instance") {
     Scene s;

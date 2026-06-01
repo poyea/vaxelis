@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "engine/physics/Components.hpp"
 #include "engine/physics/Physics2D.hpp"
@@ -75,8 +75,8 @@ TEST_CASE("Physics2D: sync_from_scene pushes external Transform2D edits to the b
     phys.sync_from_scene(s);
 
     const b2Vec2 p = b2Body_GetPosition(body);
-    REQUIRE(p.x == Catch::Approx(3.0f));   // 300px / 100ppm
-    REQUIRE(p.y == Catch::Approx(1.5f));   // 150px / 100ppm
+    REQUIRE(p.x == Catch::Approx(3.0f)); // 300px / 100ppm
+    REQUIRE(p.y == Catch::Approx(1.5f)); // 150px / 100ppm
 
     phys.shutdown();
 }
@@ -87,12 +87,12 @@ TEST_CASE("Physics2D: full two-way loop still lets a dynamic body fall") {
 
     Scene s;
     auto e = s.create_node("Box");
-    s.registry().emplace<RigidBody2D>(e);  // dynamic
+    s.registry().emplace<RigidBody2D>(e); // dynamic
     s.registry().emplace<BoxCollider2D>(e).half_extents = {16.0f, 16.0f};
 
-    phys.sync_to_scene(s);  // create body
+    phys.sync_to_scene(s); // create body
     for (int i = 0; i < 30; ++i) {
-        phys.sync_from_scene(s);  // no external edits -> must not pin the body
+        phys.sync_from_scene(s); // no external edits -> must not pin the body
         phys.step(1.0f / 60.0f);
         phys.sync_to_scene(s);
     }
