@@ -13,6 +13,8 @@ namespace {
 
 struct GLTexture {
     GLuint name;
+    uint32_t width;
+    uint32_t height;
 };
 struct GLShader {
     GLuint program;
@@ -65,7 +67,7 @@ class GLDevice final : public IDevice {
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         TextureHandle h{next_handle_++};
-        textures_.emplace(h.id, GLTexture{name});
+        textures_.emplace(h.id, GLTexture{name, d.width, d.height});
         return h;
     }
 
@@ -165,6 +167,24 @@ class GLDevice final : public IDevice {
         gl().BindBuffer(it->second.target, it->second.name);
         gl().BufferSubData(it->second.target, static_cast<GLintptr>(offset_bytes),
                            static_cast<GLsizeiptr>(data.size_bytes()), data.data());
+    }
+
+    void update_texture(TextureHandle h, const TextureUpdate& u) override {
+        auto it = textures_.find(h.id);
+        if (it == textures_.end())
+            return;
+        if (u.data == nullptr || u.width == 0 || u.height == 0)
+            return;
+        if (u.x + u.width > it->second.width || u.y + u.height > it->second.height) {
+            VX_ERROR("update_texture: region ({},{} {}x{}) out of bounds for {}x{} texture", u.x,
+                     u.y, u.width, u.height, it->second.width, it->second.height);
+            return;
+        }
+        gl().BindTexture(GL_TEXTURE_2D, it->second.name);
+        gl().PixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        gl().TexSubImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(u.x), static_cast<GLint>(u.y),
+                           static_cast<GLsizei>(u.width), static_cast<GLsizei>(u.height), GL_RGBA,
+                           GL_UNSIGNED_BYTE, u.data);
     }
 
     void begin_frame(vec4 c, uint32_t w, uint32_t h) override {

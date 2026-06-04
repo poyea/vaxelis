@@ -83,6 +83,8 @@ struct GLApi {
     void (*GenTextures)(GLsizei, GLuint*);
     void (*BindTexture)(GLenum, GLuint);
     void (*TexImage2D)(GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, const void*);
+    void (*TexSubImage2D)(GLenum, GLint, GLint, GLint, GLsizei, GLsizei, GLenum, GLenum,
+                          const void*);
     void (*TexParameteri)(GLenum, GLenum, GLint);
     void (*DeleteTextures)(GLsizei, const GLuint*);
     void (*ActiveTexture)(GLenum);

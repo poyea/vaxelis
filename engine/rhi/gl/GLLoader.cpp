@@ -51,6 +51,7 @@ bool load_gl() {
     VX_LOAD(GenTextures);
     VX_LOAD(BindTexture);
     VX_LOAD(TexImage2D);
+    VX_LOAD(TexSubImage2D);
     VX_LOAD(TexParameteri);
     VX_LOAD(DeleteTextures);
     VX_LOAD(ActiveTexture);

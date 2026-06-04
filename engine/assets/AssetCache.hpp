@@ -12,10 +12,11 @@ namespace vaxelis {
 
 class FileWatcher;
 
-// Texture cache keyed by string id (usually the file path). Reloads are
-// in-place from the cache's perspective — the public handle stays valid
-// across reloads because we destroy the old GPU texture and replace it under
-// the same key. Listeners get notified so they can refresh dependent state.
+// Texture cache keyed by string id (usually the file path). Reloads keep the
+// public handle valid: when dimensions are unchanged the pixels are uploaded
+// in place (handle and GPU object stay stable, no listener churn); when they
+// differ we destroy + recreate under the same key and notify listeners so they
+// can rebind dependent state.
 class AssetCache {
   public:
     using ReloadListener = std::function<void(std::string_view key, rhi::TextureHandle)>;
@@ -38,6 +39,8 @@ class AssetCache {
     struct TexEntry {
         std::string path;
         rhi::TextureHandle handle{};
+        uint32_t width{0};
+        uint32_t height{0};
     };
 
     rhi::IDevice* device_{nullptr};

@@ -80,7 +80,8 @@ rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_v
     if (!tex)
         return {};
 
-    TexEntry e{std::string(path), *tex};
+    TexEntry e{std::string(path), *tex, static_cast<uint32_t>(img.w),
+               static_cast<uint32_t>(img.h)};
     auto [it, _] = textures_.emplace(k, std::move(e));
     if (watcher_) {
         std::string key_copy = k;
@@ -106,13 +107,31 @@ void AssetCache::reload_texture(std::string_view key) {
     if (img.px.empty())
         return;
 
-    // No in-place texture update in the RHI yet; destroy + recreate. The
-    // listener fan-out lets clients rebind the new handle.
+    const auto new_w = static_cast<uint32_t>(img.w);
+    const auto new_h = static_cast<uint32_t>(img.h);
+
+    // Fast path: same dimensions — upload in place so the handle and GPU object
+    // stay stable. Dependents (e.g. SpriteComponent ids) need no rebinding and
+    // listeners are not disturbed.
+    if (it->second.handle.valid() && new_w == it->second.width && new_h == it->second.height) {
+        device_->update_texture(it->second.handle, rhi::TextureUpdate{
+                                                       .x = 0,
+                                                       .y = 0,
+                                                       .width = new_w,
+                                                       .height = new_h,
+                                                       .data = img.px.data(),
+                                                   });
+        VX_INFO("AssetCache: reloaded texture '{}' in place", it->first);
+        return;
+    }
+
+    // Dimensions changed (or no prior texture): recreate. The listener fan-out
+    // lets clients rebind the new handle.
     if (it->second.handle.valid())
         device_->destroy(it->second.handle);
     rhi::TextureDesc td{
-        .width = static_cast<uint32_t>(img.w),
-        .height = static_cast<uint32_t>(img.h),
+        .width = new_w,
+        .height = new_h,
         .format = rhi::TextureFormat::RGBA8,
         .initial_data = img.px.data(),
     };
@@ -122,6 +141,8 @@ void AssetCache::reload_texture(std::string_view key) {
         return;
     }
     it->second.handle = *tex;
+    it->second.width = new_w;
+    it->second.height = new_h;
     VX_INFO("AssetCache: reloaded texture '{}'", it->first);
     for (auto& l : listeners_)
         l(it->first, it->second.handle);

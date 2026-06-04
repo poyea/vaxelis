@@ -46,6 +46,16 @@ struct TextureDesc {
     const void* initial_data{nullptr}; // tightly packed; size = width*height*bpp
 };
 
+// In-place update of a sub-rectangle. `data` is tightly packed RGBA8,
+// size = width*height*bpp. The region must lie within the texture bounds.
+struct TextureUpdate {
+    uint32_t x{0};
+    uint32_t y{0};
+    uint32_t width{0};
+    uint32_t height{0};
+    const void* data{nullptr};
+};
+
 enum class BufferUsage { Vertex, Index, Uniform };
 enum class BufferAccess { Static, Dynamic };
 
@@ -75,6 +85,11 @@ class IDevice {
 
     virtual void update_buffer(BufferHandle, std::span<const std::byte> data,
                                size_t offset_bytes = 0) = 0;
+
+    // In-place upload into an existing texture (glTexSubImage2D). No-op on an
+    // invalid handle or out-of-bounds region. Keeps the handle and GPU object
+    // stable so dependents don't need rebinding.
+    virtual void update_texture(TextureHandle, const TextureUpdate&) = 0;
 
     virtual void begin_frame(vec4 clear_color, uint32_t fb_width, uint32_t fb_height) = 0;
     virtual void end_frame() = 0;
