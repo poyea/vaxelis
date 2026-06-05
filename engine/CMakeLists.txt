@@ -4,6 +4,7 @@ add_library(vaxelis_engine STATIC
     audio/Audio.cpp
     core/Log.cpp
     core/Time.cpp
+    core/Uuid.cpp
     core/Application.cpp
     input/Input.cpp
     physics/Physics2D.cpp

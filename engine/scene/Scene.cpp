@@ -13,15 +13,25 @@ Scene::Scene() {
     registry_.emplace<Transform2D>(root_);
 }
 
-entt::entity Scene::create_node(std::string name, entt::entity parent) {
+entt::entity Scene::create_node(std::string name, entt::entity parent, Uuid uuid) {
     if (parent == entt::null)
         parent = root_;
     auto e = registry_.create();
+    registry_.emplace<Id>(e, Id{uuid.valid() ? uuid : generate_uuid()});
     registry_.emplace<Name>(e, Name{std::move(name)});
     registry_.emplace<Hierarchy>(e, Hierarchy{parent, {}});
     registry_.emplace<Transform2D>(e);
     registry_.get<Hierarchy>(parent).children.push_back(e);
     return e;
+}
+
+entt::entity Scene::find_by_uuid(const Uuid& uuid) const {
+    if (!uuid.valid())
+        return entt::null;
+    for (auto e : registry_.view<const Id>())
+        if (registry_.get<const Id>(e).uuid == uuid)
+            return e;
+    return entt::null;
 }
 
 void Scene::detach_from_parent(entt::entity e) {

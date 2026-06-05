@@ -78,3 +78,58 @@ TEST_CASE("Scene: JSON round-trip preserves hierarchy and components") {
     REQUIRE(ls.size.x == 64.0f);
     REQUIRE(ls.z_order == 5);
 }
+
+TEST_CASE("Scene: nodes get unique stable uuids") {
+    Scene s;
+    auto a = s.create_node("A");
+    auto b = s.create_node("B");
+    const auto& ida = s.registry().get<Id>(a).uuid;
+    const auto& idb = s.registry().get<Id>(b).uuid;
+    REQUIRE(ida.valid());
+    REQUIRE(idb.valid());
+    REQUIRE_FALSE(ida == idb);
+    REQUIRE(s.find_by_uuid(ida) == a);
+    REQUIRE(s.find_by_uuid(idb) == b);
+    REQUIRE(s.find_by_uuid(Uuid{}) == entt::null);
+}
+
+TEST_CASE("Scene: uuids survive a save/load round-trip") {
+    Scene s;
+    auto a = s.create_node("Parent");
+    auto b = s.create_node("Child", a);
+    const Uuid ida = s.registry().get<Id>(a).uuid;
+    const Uuid idb = s.registry().get<Id>(b).uuid;
+
+    Scene loaded;
+    REQUIRE(scene_io::from_json(loaded, scene_io::to_json(s)));
+
+    auto la = loaded.find_by_uuid(ida);
+    auto lb = loaded.find_by_uuid(idb);
+    REQUIRE(loaded.registry().valid(la));
+    REQUIRE(loaded.registry().valid(lb));
+    REQUIRE(loaded.registry().get<Name>(la).value == "Parent");
+    // Parent linkage is preserved by uuid, not by load order.
+    REQUIRE(loaded.registry().get<Hierarchy>(lb).parent == la);
+}
+
+TEST_CASE("Scene: merging two loads keeps references distinct") {
+    Scene src;
+    auto n = src.create_node("Shared");
+    const Uuid id = src.registry().get<Id>(n).uuid;
+    const auto json = scene_io::to_json(src);
+
+    // Loading the same file twice into one scene appends two independent
+    // copies; the first keeps the original uuid, the duplicate is detectable.
+    Scene merged;
+    REQUIRE(scene_io::from_json(merged, json));
+    REQUIRE(scene_io::from_json(merged, json));
+
+    int shared_nodes = 0;
+    merged.for_each([&](entt::entity e) {
+        if (e != merged.root() && merged.registry().get<Name>(e).value == "Shared")
+            ++shared_nodes;
+    });
+    REQUIRE(shared_nodes == 2);
+    // The original uuid still resolves to exactly one node.
+    REQUIRE(merged.registry().valid(merged.find_by_uuid(id)));
+}

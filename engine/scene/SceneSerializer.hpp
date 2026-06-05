@@ -12,10 +12,12 @@ class Scene;
 // `host_resolve` (e.g. an asset cache lookup).
 //
 // File format (top-level):
-// { "nodes": [ { "id": 1, "name": "...", "parent": 0,
+// { "nodes": [ { "id": "<uuid>", "name": "...", "parent": "<uuid>"|null,
 //                "transform": { "pos": [x,y], "rot": r, "scale": [x,y] },
 //                "sprite": { "texture_key": "...", "size": [w,h], ... } }, ... ] }
-// `id` is per-file (not entt id), `parent == 0` means root.
+// `id`/`parent` are stable Uuids (see Components::Id); `parent == null` means
+// the implicit root. Legacy files using integer ids (parent 0 == root) still
+// load, but their nodes are assigned fresh uuids on import.
 namespace scene_io {
 
 std::string to_json(const Scene&, int indent = 2);

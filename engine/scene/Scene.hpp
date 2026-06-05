@@ -24,9 +24,15 @@ class Scene {
     const entt::registry& registry() const { return registry_; }
     entt::entity root() const { return root_; }
 
-    // Creates a node with a Name + Hierarchy + Transform2D. Parent defaults
-    // to root. Caller adds extra components via registry().emplace<>.
-    entt::entity create_node(std::string name, entt::entity parent = entt::null);
+    // Creates a node with an Id + Name + Hierarchy + Transform2D. Parent
+    // defaults to root. A fresh Uuid is generated unless `uuid` is valid, in
+    // which case it is adopted (used by deserialization to restore identity).
+    // Caller adds extra components via registry().emplace<>.
+    entt::entity create_node(std::string name, entt::entity parent = entt::null, Uuid uuid = {});
+
+    // Finds the node carrying `uuid`, or entt::null. O(N) scan — intended for
+    // load/merge wiring, not per-frame use.
+    entt::entity find_by_uuid(const Uuid& uuid) const;
 
     // Destroys `e` and all descendants. Removes the entry from the parent's
     // child list. No-op if `e` is null or already destroyed.

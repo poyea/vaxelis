@@ -5,12 +5,20 @@
 
 #include <entt/entt.hpp>
 
+#include "engine/core/Uuid.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/rhi/Rhi.hpp"
 
 namespace vaxelis {
 
-// Identifier. Default-constructed entities get "Node" so the inspector tree
+// Stable identity. Assigned once at node creation and preserved across
+// save/load, so references survive reordering and stay unique across merges.
+// (entt handles, by contrast, are reused and per-registry.)
+struct Id {
+    Uuid uuid;
+};
+
+// Display name. Default-constructed entities get "Node" so the inspector tree
 // never shows a blank row.
 struct Name {
     std::string value{"Node"};

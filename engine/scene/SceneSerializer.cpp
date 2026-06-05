@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <nlohmann/json.hpp>
 
@@ -32,16 +33,6 @@ vec4 load_vec4(const json& j) {
 } // namespace
 
 std::string to_json(const Scene& s, int indent) {
-    // Assign per-file ids: 0 = root, 1..N = real nodes in DFS order.
-    std::unordered_map<entt::entity, int> ids;
-    ids[s.root()] = 0;
-    int next_id = 1;
-    s.for_each([&](entt::entity e) {
-        if (e == s.root())
-            return;
-        ids[e] = next_id++;
-    });
-
     json out;
     out["nodes"] = json::array();
     s.for_each([&](entt::entity e) {
@@ -49,9 +40,13 @@ std::string to_json(const Scene& s, int indent) {
             return;
         const auto& reg = s.registry();
         json node;
-        node["id"] = ids[e];
+        // Stable per-node identity; survives reorder/merge (see Components::Id).
+        node["id"] = to_string(reg.get<Id>(e).uuid);
         node["name"] = reg.get<Name>(e).value;
-        node["parent"] = ids[reg.get<Hierarchy>(e).parent];
+        const auto parent = reg.get<Hierarchy>(e).parent;
+        node["parent"] = (parent == s.root() || parent == entt::null)
+                             ? json(nullptr)
+                             : json(to_string(reg.get<Id>(parent).uuid));
 
         const auto& t = reg.get<Transform2D>(e);
         node["transform"] = {
@@ -88,32 +83,61 @@ bool from_json(Scene& s, std::string_view jtext) {
         return false;
     }
 
-    // Two-pass: create all entities (so parent ids resolve), then wire up
+    // Maps a node's "id"/"parent" JSON value to a stable lookup token. New
+    // files carry a uuid string; legacy files carried an integer (rendered
+    // "#<n>"). Returns empty for anything else (e.g. a null/absent parent).
+    auto to_token = [](const json& v) -> std::string {
+        if (v.is_string())
+            return v.get<std::string>();
+        if (v.is_number_integer())
+            return "#" + std::to_string(v.get<long long>());
+        return {};
+    };
+
+    // Existing uuids (the scene may already hold nodes — from_json appends).
+    // Incoming ids that collide are reminted so merges/instancing stay unique;
+    // a load into a fresh scene preserves every stored uuid.
+    std::unordered_set<Uuid> used;
+    for (auto e : s.registry().view<const Id>())
+        used.insert(s.registry().get<const Id>(e).uuid);
+
+    // Two-pass: create all entities (so parent refs resolve), then wire up
     // parents and populate components.
-    std::unordered_map<int, entt::entity> by_file_id;
-    by_file_id[0] = s.root();
+    std::unordered_map<std::string, entt::entity> by_token;
+    by_token["#0"] = s.root(); // legacy root reference
 
     for (const auto& node : j["nodes"]) {
-        int id = node.value("id", 0);
-        if (id == 0)
+        if (!node.contains("id"))
             continue;
-        auto e = s.create_node(node.value("name", std::string{"Node"}));
-        by_file_id[id] = e;
+        const std::string token = to_token(node["id"]);
+        if (token.empty() || token == "#0")
+            continue;
+        // Adopt the stored uuid unless it is malformed (legacy integer ids),
+        // null, or already taken — create_node mints a fresh one for {}.
+        Uuid uuid = node["id"].is_string() ? uuid_from_string(token) : Uuid{};
+        if (uuid.valid() && !used.insert(uuid).second)
+            uuid = {}; // collision: let create_node remint
+        auto e = s.create_node(node.value("name", std::string{"Node"}), entt::null, uuid);
+        used.insert(s.registry().get<Id>(e).uuid); // covers the reminted case
+        by_token[token] = e;
     }
 
     for (const auto& node : j["nodes"]) {
-        int id = node.value("id", 0);
-        if (id == 0)
+        if (!node.contains("id"))
             continue;
-        auto it = by_file_id.find(id);
-        if (it == by_file_id.end())
+        const std::string token = to_token(node["id"]);
+        if (token.empty() || token == "#0")
+            continue;
+        auto it = by_token.find(token);
+        if (it == by_token.end())
             continue;
         auto e = it->second;
 
-        int parent_id = node.value("parent", 0);
-        auto pit = by_file_id.find(parent_id);
-        if (pit != by_file_id.end())
-            s.set_parent(e, pit->second);
+        if (node.contains("parent")) {
+            auto pit = by_token.find(to_token(node["parent"]));
+            if (pit != by_token.end())
+                s.set_parent(e, pit->second);
+        }
 
         if (node.contains("transform")) {
             const auto& tj = node["transform"];
