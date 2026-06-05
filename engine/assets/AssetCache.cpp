@@ -80,8 +80,12 @@ rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_v
     if (!tex)
         return {};
 
-    TexEntry e{std::string(path), *tex, static_cast<uint32_t>(img.w),
-               static_cast<uint32_t>(img.h)};
+    TexEntry e{
+        .path = std::string(path),
+        .handle = *tex,
+        .width = static_cast<uint32_t>(img.w),
+        .height = static_cast<uint32_t>(img.h),
+    };
     auto [it, _] = textures_.emplace(k, std::move(e));
     if (watcher_) {
         std::string key_copy = k;
