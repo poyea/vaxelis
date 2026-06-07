@@ -90,7 +90,7 @@ TEST_CASE("Scene: nodes get unique stable uuids") {
     REQUIRE_FALSE(ida == idb);
     REQUIRE(s.find_by_uuid(ida) == a);
     REQUIRE(s.find_by_uuid(idb) == b);
-    REQUIRE(s.find_by_uuid(Uuid{}) == entt::null);
+    REQUIRE((s.find_by_uuid(Uuid{}) == entt::null));
 }
 
 TEST_CASE("Scene: uuids survive a save/load round-trip") {
