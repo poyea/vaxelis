@@ -31,6 +31,12 @@ target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
 # --- miniaudio (header-only; implementation compiled in engine/audio/Audio.cpp) ---
 add_library(miniaudio INTERFACE)
 target_include_directories(miniaudio INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/miniaudio)
+# The Emscripten WebAudio backend embeds EM_ASM blocks using $0/$1 placeholders,
+# which trip -Wdollar-in-identifier-extension. Suppress it for consumers (the
+# engine builds with -Werror); propagates after the engine's own warning flags.
+if(EMSCRIPTEN)
+    target_compile_options(miniaudio INTERFACE -Wno-dollar-in-identifier-extension)
+endif()
 
 # --- entt (header-only, single-include) ---
 add_library(entt INTERFACE)
