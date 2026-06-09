@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <string>
@@ -126,6 +127,13 @@ class Platformer final : public vaxelis::Application {
             const auto& t = scene_.registry().get<vaxelis::Transform2D>(player_);
             const float follow = 1.0f - std::exp(-8.0f * dt);
             camera_.position += (t.position - camera_.position) * follow;
+        }
+        // Levels are single-screen; zoom so the level fills the framebuffer,
+        // which tracks the window (and on web, the browser viewport).
+        const vaxelis::vec2 world = map_.world_size();
+        if (world.x > 0.0f && world.y > 0.0f) {
+            camera_.zoom = std::min(static_cast<float>(width()) / world.x,
+                                    static_cast<float>(height()) / world.y);
         }
         camera_.apply_bounds(width(), height());
     }

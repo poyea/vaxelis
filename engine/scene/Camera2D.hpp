@@ -24,7 +24,8 @@ struct Camera2D {
     }
 
     // Clamps `position` so the camera's visible rect stays inside [bounds_min,
-    // bounds_max]. No-op when bounds are degenerate or smaller than the view.
+    // bounds_max]. An axis whose bounded extent is smaller than the view is
+    // centered on the bounds instead. No-op when bounds are degenerate.
     void apply_bounds(uint32_t screen_w, uint32_t screen_h) {
         if (bounds_min == bounds_max)
             return;
@@ -34,10 +35,10 @@ struct Camera2D {
         const float max_x = bounds_max.x - hw;
         const float min_y = bounds_min.y + hh;
         const float max_y = bounds_max.y - hh;
-        if (max_x > min_x)
-            position.x = glm::clamp(position.x, min_x, max_x);
-        if (max_y > min_y)
-            position.y = glm::clamp(position.y, min_y, max_y);
+        position.x = max_x > min_x ? glm::clamp(position.x, min_x, max_x)
+                                   : (bounds_min.x + bounds_max.x) * 0.5f;
+        position.y = max_y > min_y ? glm::clamp(position.y, min_y, max_y)
+                                   : (bounds_min.y + bounds_max.y) * 0.5f;
     }
 };
 
