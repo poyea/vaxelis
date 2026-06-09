@@ -26,6 +26,18 @@ git submodule update --init --recursive
 
 **Linux deps:** `libasound2-dev libpulse-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxkbcommon-dev libwayland-dev libgl-dev libdbus-1-dev libudev-dev`
 
+## Web (Emscripten)
+
+With an activated [emsdk](https://emscripten.org/docs/getting_started/downloads.html):
+
+```bash
+emcmake cmake -S . -B build-web
+cmake --build build-web
+python3 -m http.server 8000 --directory build-web/runtime
+```
+
+Then open <http://localhost:8000/vaxelis_runtime.html>.
+
 ## Test
 
 ```bash
