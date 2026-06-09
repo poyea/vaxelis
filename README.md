@@ -28,9 +28,10 @@ git submodule update --init --recursive
 
 ## Web (Emscripten)
 
-With an activated [emsdk](https://emscripten.org/docs/getting_started/downloads.html):
+With [emsdk](https://emscripten.org/docs/getting_started/downloads.html) installed:
 
 ```bash
+source <path-to-emsdk>/emsdk_env.sh   # puts emcmake on PATH for this shell
 emcmake cmake -S . -B build-web
 cmake --build build-web
 python3 -m http.server 8000 --directory build-web/runtime
