@@ -381,7 +381,7 @@ class Platformer final : public vaxelis::Application {
 
         // Jump: only when close to standing still vertically (rough ground-check).
         if (input().pressed("jump") && std::abs(v.y) < 0.2f) {
-            b2Body_ApplyLinearImpulseToCenter(rb.body, b2Vec2{0.0f, -520.0f / ppm}, true);
+            b2Body_ApplyLinearImpulseToCenter(rb.body, b2Vec2{0.0f, -65.0f / ppm}, true);
             play_cue("jump");
         }
         (void) dt;
