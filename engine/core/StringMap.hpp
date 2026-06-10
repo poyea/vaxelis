@@ -8,9 +8,9 @@
 
 namespace vaxelis {
 
-// Transparent hash for string-keyed containers: heterogeneous lookup lets
-// find()/contains() take a string_view (or char*) without allocating a
-// temporary std::string key.
+/// Transparent hash for string-keyed containers: heterogeneous lookup lets
+/// find()/contains() take a string_view (or char*) without allocating a
+/// temporary std::string key.
 struct StringHash {
     using is_transparent = void;
     size_t operator()(std::string_view s) const noexcept {
@@ -18,6 +18,7 @@ struct StringHash {
     }
 };
 
+/// std::string-keyed map with transparent string_view lookup.
 template <class T>
 using StringMap = std::unordered_map<std::string, T, StringHash, std::equal_to<>>;
 

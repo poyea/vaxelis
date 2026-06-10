@@ -6,13 +6,16 @@ namespace vaxelis {
 
 class Scene;
 
-// ImGui-driven scene inspector: hierarchy tree on the left, property editor
-// on the right. Call inside an ImGui frame.
+/// ImGui-driven scene inspector: hierarchy tree on the left, property editor
+/// on the right. Call inside an ImGui frame.
 class SceneInspector {
   public:
+    /// Draws the inspector UI for `scene`.
     void draw(Scene& scene);
 
+    /// Currently selected entity, or entt::null.
     entt::entity selected() const { return selected_; }
+    /// Changes the selection programmatically.
     void select(entt::entity e) { selected_ = e; }
 
   private:

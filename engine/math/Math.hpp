@@ -1,6 +1,7 @@
 #pragma once
 
-// Y-up, right-handed. Forward-declared wrapper around glm for engine code.
+/// @file
+/// Y-up, right-handed. Forward-declared wrapper around glm for engine code.
 
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
@@ -18,6 +19,7 @@ using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 using mat4 = glm::mat4;
 
+/// Axis-aligned 2D bounding box.
 struct AABB2 {
     vec2 min;
     vec2 max;

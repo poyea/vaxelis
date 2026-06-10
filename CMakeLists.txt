@@ -17,6 +17,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(VAXELIS_BUILD_RUNTIME "Build the runtime executable" ON)
 option(VAXELIS_BUILD_TESTS "Build unit tests" ${BUILD_TESTING})
 option(VAXELIS_ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
+option(VAXELIS_BUILD_DOCS "Build API documentation with Doxygen" OFF)
 
 # The Catch2 host tests have no runner in the browser; force them off for web.
 if(EMSCRIPTEN)
@@ -42,4 +43,8 @@ endif()
 
 if(VAXELIS_BUILD_TESTS)
     add_subdirectory(tests)
+endif()
+
+if(VAXELIS_BUILD_DOCS)
+    add_subdirectory(docs)
 endif()

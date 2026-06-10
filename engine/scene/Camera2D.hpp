@@ -4,18 +4,19 @@
 
 namespace vaxelis {
 
-// Screen-space 2D camera. Position is the world point at the screen center.
-// `zoom` > 1 magnifies. Y-down to match the rest of the renderer.
+/// Screen-space 2D camera. Position is the world point at the screen center.
+/// `zoom` > 1 magnifies. Y-down to match the rest of the renderer.
 struct Camera2D {
     vec2 position{0.0f, 0.0f};
     float zoom{1.0f};
 
-    // Optional world-space clamp; if both extents are zero, no clamping.
+    /// Optional world-space clamp; if both extents are zero, no clamping.
     vec2 bounds_min{0.0f, 0.0f};
+    /// See bounds_min.
     vec2 bounds_max{0.0f, 0.0f};
 
-    // Orthographic projection that maps the visible world rect to NDC. Pass
-    // the framebuffer size in pixels.
+    /// Orthographic projection that maps the visible world rect to NDC. Pass
+    /// the framebuffer size in pixels.
     mat4 projection(uint32_t screen_w, uint32_t screen_h) const {
         const float hw = (static_cast<float>(screen_w) * 0.5f) / zoom;
         const float hh = (static_cast<float>(screen_h) * 0.5f) / zoom;
@@ -23,9 +24,9 @@ struct Camera2D {
                           1.0f);
     }
 
-    // Clamps `position` so the camera's visible rect stays inside [bounds_min,
-    // bounds_max]. An axis whose bounded extent is smaller than the view is
-    // centered on the bounds instead. No-op when bounds are degenerate.
+    /// Clamps `position` so the camera's visible rect stays inside [bounds_min,
+    /// bounds_max]. An axis whose bounded extent is smaller than the view is
+    /// centered on the bounds instead. No-op when bounds are degenerate.
     void apply_bounds(uint32_t screen_w, uint32_t screen_h) {
         if (bounds_min == bounds_max)
             return;

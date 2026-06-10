@@ -1,8 +1,9 @@
 #pragma once
 
-// Drop-in for std::expected, including the monadic operations the engine
-// uses. Aliases the standard type when the library provides it; otherwise a
-// minimal variant-backed shim fills in.
+/// @file
+/// Drop-in for std::expected, including the monadic operations the engine
+/// uses. Aliases the standard type when the library provides it; otherwise a
+/// minimal variant-backed shim fills in.
 
 #include <version>
 
@@ -19,6 +20,7 @@ template <class E> using unexpected = std::unexpected<E>;
 
 namespace vaxelis {
 
+/// Error wrapper for the fallback expected shim; mirrors std::unexpected.
 template <class E> class unexpected {
   public:
     constexpr explicit unexpected(const E& e) : err_(e) {}
@@ -31,6 +33,7 @@ template <class E> class unexpected {
     E err_;
 };
 
+/// Minimal variant-backed std::expected shim; see the file comment.
 template <class T, class E> class expected {
   public:
     constexpr expected(const T& v) : data_(std::in_place_index<0>, v) {}
@@ -55,8 +58,8 @@ template <class T, class E> class expected {
         return has_value() ? std::get<0>(data_) : T(std::forward<U>(def));
     }
 
-    // Monadic operations: just the subset the engine uses. For and_then,
-    // `f` must return an expected with the same error type.
+    /// Monadic operations: just the subset the engine uses. For and_then,
+    /// `f` must return an expected with the same error type.
     template <class F> constexpr auto and_then(F&& f) const& {
         using R = std::remove_cvref_t<std::invoke_result_t<F, const T&>>;
         return has_value() ? std::forward<F>(f)(std::get<0>(data_))

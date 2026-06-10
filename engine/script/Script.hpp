@@ -17,12 +17,12 @@ namespace vaxelis {
 class Scene;
 class Input;
 
-// Owns the Lua VM, exposes engine bindings to scripts, runs per-script
-// `on_update(dt)` callbacks.
-//
-// Scripts attach to scene entities via the ScriptComponent (path to a .lua
-// file). Each script runs in its own Lua subtable namespace so globals don't
-// collide; the table exposes `entity_id` plus any callbacks the script defines.
+/// Owns the Lua VM, exposes engine bindings to scripts, runs per-script
+/// `on_update(dt)` callbacks.
+///
+/// Scripts attach to scene entities via the ScriptComponent (path to a .lua
+/// file). Each script runs in its own Lua subtable namespace so globals don't
+/// collide; the table exposes `entity_id` plus any callbacks the script defines.
 class ScriptHost {
   public:
     ScriptHost();
@@ -31,24 +31,26 @@ class ScriptHost {
     ScriptHost(const ScriptHost&) = delete;
     ScriptHost& operator=(const ScriptHost&) = delete;
 
-    // Binds engine API (vec2, scene helpers, input queries) into the Lua state.
+    /// Binds engine API (vec2, scene helpers, input queries) into the Lua state.
     bool init(Scene& scene, Input& input);
 
-    // Hooks an entt destroy-signal so that removing a ScriptComponent (or
-    // destroying the owning entity) tears down the script's Lua subtable,
-    // letting the table and anything it captured be garbage-collected. Call
-    // once per Scene, after `init()`. The connection detaches when the registry
-    // is destroyed.
+    /// Hooks an entt destroy-signal so that removing a ScriptComponent (or
+    /// destroying the owning entity) tears down the script's Lua subtable,
+    /// letting the table and anything it captured be garbage-collected. Call
+    /// once per Scene, after `init()`. The connection detaches when the registry
+    /// is destroyed.
     void register_with(Scene& scene);
 
-    // Loads/reloads scripts for every ScriptComponent that needs it, then
-    // calls on_update(dt) on each.
+    /// Loads/reloads scripts for every ScriptComponent that needs it, then
+    /// calls on_update(dt) on each.
     void update(float dt, Scene& scene);
 
+    /// Direct access to the underlying Lua state.
     sol::state& lua();
 
-    // True while the host still holds a live Lua subtable for `instance_key`.
+    /// True while the host still holds a live Lua subtable for `instance_key`.
     bool has_instance(const std::string& instance_key) const;
+    /// Number of live script instances.
     size_t instance_count() const;
 
   private:
@@ -58,8 +60,8 @@ class ScriptHost {
     std::unique_ptr<Impl> impl_;
 };
 
-// Per-entity component. `path` is the .lua file; `loaded` tracks whether the
-// host has bound it. `instance_key` is the Lua subtable name (auto-assigned).
+/// Per-entity component. `path` is the .lua file; `loaded` tracks whether the
+/// host has bound it. `instance_key` is the Lua subtable name (auto-assigned).
 struct ScriptComponent {
     std::string path;
     bool loaded{false};

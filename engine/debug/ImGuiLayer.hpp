@@ -5,15 +5,19 @@ union SDL_Event;
 
 namespace vaxelis {
 
+/// Dear ImGui integration for the SDL3 + OpenGL backends.
 class ImGuiLayer {
   public:
-    // gl_context is an SDL_GLContext (void*).
+    /// gl_context is an SDL_GLContext (void*).
     void init(SDL_Window* window, void* gl_context);
     void shutdown();
 
+    /// Forwards an SDL event to ImGui.
     void process_event(const SDL_Event& ev);
+    /// Starts a new ImGui frame.
     void begin_frame();
-    void end_frame(); // submits ImGui draw data on current GL context
+    /// Ends the frame and submits ImGui draw data on the current GL context.
+    void end_frame();
 };
 
 } // namespace vaxelis

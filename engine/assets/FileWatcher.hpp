@@ -8,22 +8,26 @@
 
 namespace vaxelis {
 
-// Polling-based file watcher. Cross-platform (mtime), low frequency. Each
-// watched path holds a callback that fires when the file's last_write_time
-// changes vs. the previous tick.
-//
-// Designed for editor/dev use, not for production hot paths. Default tick
-// interval is 250ms; call tick(dt) every frame.
+/// Polling-based file watcher. Cross-platform (mtime), low frequency. Each
+/// watched path holds a callback that fires when the file's last_write_time
+/// changes vs. the previous tick.
+///
+/// Designed for editor/dev use, not for production hot paths. Default tick
+/// interval is 250ms; call tick(dt) every frame.
 class FileWatcher {
   public:
     using Callback = std::function<void(const std::string& path)>;
 
+    /// Starts watching `path`; `cb` fires on each detected change.
     void watch(std::string path, Callback cb);
+    /// Stops watching `path`.
     void unwatch(const std::string& path);
 
-    // Returns the number of files that changed this tick.
+    /// Polls watched files once the interval has elapsed.
+    /// @return the number of files that changed this tick.
     int tick(float dt);
 
+    /// Sets the polling interval in seconds.
     void set_interval(float seconds) { interval_ = seconds; }
 
   private:

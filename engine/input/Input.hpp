@@ -13,30 +13,36 @@ union SDL_Event;
 
 namespace vaxelis {
 
-// Polled input + named action bindings. Call begin_frame() once per frame
-// before SDL_PollEvent, on_event() for each SDL event. Then query.
-//
-// Edge queries (pressed/released) compare a snapshot taken in begin_frame()
-// against the live state mutated by on_event(), so they're stable across all
-// queries within a single frame.
+/// Polled input + named action bindings. Call begin_frame() once per frame
+/// before SDL_PollEvent, on_event() for each SDL event. Then query.
+///
+/// Edge queries (pressed/released) compare a snapshot taken in begin_frame()
+/// against the live state mutated by on_event(), so they're stable across all
+/// queries within a single frame.
 class Input {
   public:
+    /// Snapshots key state for this frame's edge queries.
     void begin_frame();
+    /// Feeds one SDL event into the live key state.
     void on_event(const SDL_Event& ev);
 
-    // An action maps to one or more scancodes; ANY bound key satisfies the query.
+    /// An action maps to one or more scancodes; ANY bound key satisfies the query.
     void bind_action(std::string name, SDL_Scancode key);
+    /// Binds several scancodes to one action in a single call.
     void bind_action(std::string name, std::initializer_list<SDL_Scancode> keys);
+    /// Removes all action bindings.
     void clear_actions();
 
-    // Raw key queries (scancode-based).
+    /// Raw key query (scancode-based): true while the key is held.
     bool down(SDL_Scancode) const;
-    bool pressed(SDL_Scancode) const;  // went down this frame
-    bool released(SDL_Scancode) const; // went up this frame
+    bool pressed(SDL_Scancode) const;  ///< went down this frame
+    bool released(SDL_Scancode) const; ///< went up this frame
 
-    // Named-action queries.
+    /// Named-action variant of down().
     bool down(std::string_view name) const;
+    /// Named-action variant of pressed().
     bool pressed(std::string_view name) const;
+    /// Named-action variant of released().
     bool released(std::string_view name) const;
 
   private:
