@@ -76,3 +76,34 @@ jobs:
         run: cmake --build build --parallel
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  # Non-blocking early warning: keeps the codebase C++26-ready ahead of the
+  # supported-toolchain floor. Needs the runner's CMake (>= 3.30) for the
+  # clang cxx_std_26 mapping, so this job does not use the repo minimum.
+  cxx26-ready:
+    needs: format
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install toolchain + SDL deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build clang-18 pkg-config \
+            libasound2-dev libpulse-dev libjack-dev libsndio-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libudev-dev libwayland-dev libdecor-0-dev
+      - name: Configure (C++26)
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: cmake -S . -B build -G Ninja -DCMAKE_CXX_STANDARD=26 -DCPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=OFF
+      - name: Build
+        run: cmake --build build --parallel
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
