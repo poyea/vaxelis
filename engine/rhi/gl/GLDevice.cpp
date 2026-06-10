@@ -93,36 +93,39 @@ class GLDevice final : public IDevice {
             return s;
         };
 
-        auto vs = compile(GL_VERTEX_SHADER, d.vertex_src);
-        if (!vs)
-            return vaxelis::unexpected(vs.error());
-        auto fs = compile(GL_FRAGMENT_SHADER, d.fragment_src);
-        if (!fs) {
-            gl().DeleteShader(*vs);
-            return vaxelis::unexpected(fs.error());
-        }
-
-        GLuint prog = gl().CreateProgram();
-        gl().AttachShader(prog, *vs);
-        gl().AttachShader(prog, *fs);
-        gl().LinkProgram(prog);
-        gl().DeleteShader(*vs);
-        gl().DeleteShader(*fs);
-        GLint ok = 0;
-        gl().GetProgramiv(prog, GL_LINK_STATUS, &ok);
-        if (!ok) {
-            GLint log_len = 0;
-            gl().GetProgramiv(prog, GL_INFO_LOG_LENGTH, &log_len);
-            std::vector<char> log(static_cast<size_t>(log_len) + 1, 0);
-            gl().GetProgramInfoLog(prog, log_len, nullptr, log.data());
-            VX_ERROR("GL program link failed: {}", log.data());
-            gl().DeleteProgram(prog);
-            return vaxelis::unexpected(RhiError::ProgramLinkFailed);
-        }
-        ShaderHandle h{next_handle_++};
-        shaders_.emplace(h.id, GLShader{prog, gl().GetUniformLocation(prog, "u_mvp"),
-                                        gl().GetUniformLocation(prog, "u_tex")});
-        return h;
+        // Monadic chain: a compile failure short-circuits and propagates its
+        // error; transform_error releases the vertex stage when the fragment
+        // stage fails mid-chain.
+        return compile(GL_VERTEX_SHADER, d.vertex_src).and_then([&](GLuint vs) {
+            return compile(GL_FRAGMENT_SHADER, d.fragment_src)
+                .transform_error([&](RhiError e) {
+                    gl().DeleteShader(vs);
+                    return e;
+                })
+                .and_then([&](GLuint fs) -> vaxelis::expected<ShaderHandle, RhiError> {
+                    GLuint prog = gl().CreateProgram();
+                    gl().AttachShader(prog, vs);
+                    gl().AttachShader(prog, fs);
+                    gl().LinkProgram(prog);
+                    gl().DeleteShader(vs);
+                    gl().DeleteShader(fs);
+                    GLint ok = 0;
+                    gl().GetProgramiv(prog, GL_LINK_STATUS, &ok);
+                    if (!ok) {
+                        GLint log_len = 0;
+                        gl().GetProgramiv(prog, GL_INFO_LOG_LENGTH, &log_len);
+                        std::vector<char> log(static_cast<size_t>(log_len) + 1, 0);
+                        gl().GetProgramInfoLog(prog, log_len, nullptr, log.data());
+                        VX_ERROR("GL program link failed: {}", log.data());
+                        gl().DeleteProgram(prog);
+                        return vaxelis::unexpected(RhiError::ProgramLinkFailed);
+                    }
+                    ShaderHandle h{next_handle_++};
+                    shaders_.emplace(h.id, GLShader{prog, gl().GetUniformLocation(prog, "u_mvp"),
+                                                    gl().GetUniformLocation(prog, "u_tex")});
+                    return h;
+                });
+        });
     }
 
     vaxelis::expected<BufferHandle, RhiError> create_buffer(const BufferDesc& d) override {

@@ -75,7 +75,7 @@ bool ScriptHost::init(Scene& scene, Input& input) {
                      sol::lib::os);
 
     // vec2 type. Bound via property lambdas instead of direct &vec2::x member
-    // pointers — clang-18 / strict C++23 rejects sol2's member-pointer dispatcher
+    // pointers; clang-18 / strict C++23 rejects sol2's member-pointer dispatcher
     // due to a noexcept(...) signature mismatch on the generated thunk.
     L.new_usertype<vec2>(
         "vec2", sol::constructors<vec2(), vec2(float, float)>(), "x",
@@ -85,7 +85,7 @@ bool ScriptHost::init(Scene& scene, Input& input) {
     // engine.* namespace.
     auto engine = L["engine"].get_or_create<sol::table>();
 
-    // engine.log(message) — info-level.
+    // engine.log(message): info-level.
     engine.set_function("log", [](const std::string& msg) { VX_INFO("[lua] {}", msg); });
 
     // engine.input.down/pressed/released(action)

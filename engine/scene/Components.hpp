@@ -57,7 +57,7 @@ struct WorldTransform2D {
 };
 
 // Renderable sprite. `texture_key` is a string ID the host resolves against
-// its asset table — keeps serialization texture-agnostic. `texture` is the
+// its asset table; keeps serialization texture-agnostic. `texture` is the
 // runtime-resolved handle, not serialized.
 struct SpriteComponent {
     std::string texture_key;

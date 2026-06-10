@@ -45,9 +45,7 @@ bool Input::released(SDL_Scancode k) const {
 }
 
 bool Input::down(std::string_view name) const {
-    // unordered_map heterogeneous lookup is C++20 only with a transparent hash,
-    // so we accept the std::string copy here — query rate is low.
-    auto it = actions_.find(std::string(name));
+    auto it = actions_.find(name);
     if (it == actions_.end())
         return false;
     for (auto k : it->second.keys)
@@ -56,7 +54,7 @@ bool Input::down(std::string_view name) const {
     return false;
 }
 bool Input::pressed(std::string_view name) const {
-    auto it = actions_.find(std::string(name));
+    auto it = actions_.find(name);
     if (it == actions_.end())
         return false;
     for (auto k : it->second.keys)
@@ -65,7 +63,7 @@ bool Input::pressed(std::string_view name) const {
     return false;
 }
 bool Input::released(std::string_view name) const {
-    auto it = actions_.find(std::string(name));
+    auto it = actions_.find(name);
     if (it == actions_.end())
         return false;
     for (auto k : it->second.keys)

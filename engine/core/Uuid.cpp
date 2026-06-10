@@ -1,8 +1,7 @@
 #include "engine/core/Uuid.hpp"
 
 #include <array>
-#include <cctype>
-#include <cstdio>
+#include <format>
 #include <random>
 
 namespace vaxelis {
@@ -38,13 +37,8 @@ Uuid generate_uuid() {
 }
 
 std::string to_string(const Uuid& u) {
-    char buf[37];
-    std::snprintf(buf, sizeof(buf), "%08x-%04x-%04x-%04x-%012llx",
-                  static_cast<uint32_t>(u.hi >> 32), static_cast<uint32_t>((u.hi >> 16) & 0xFFFF),
-                  static_cast<uint32_t>(u.hi & 0xFFFF),
-                  static_cast<uint32_t>((u.lo >> 48) & 0xFFFF),
-                  static_cast<unsigned long long>(u.lo & 0xFFFFFFFFFFFFull));
-    return std::string(buf);
+    return std::format("{:08x}-{:04x}-{:04x}-{:04x}-{:012x}", u.hi >> 32, (u.hi >> 16) & 0xFFFF,
+                       u.hi & 0xFFFF, (u.lo >> 48) & 0xFFFF, u.lo & 0xFFFFFFFFFFFFull);
 }
 
 Uuid uuid_from_string(std::string_view s) {

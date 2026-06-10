@@ -29,7 +29,7 @@ TEST_CASE("Scene: set_parent rejects cycles") {
     Scene s;
     auto a = s.create_node("A");
     auto b = s.create_node("B", a);
-    // Reparenting a under b would form a cycle — must be rejected.
+    // Reparenting a under b would form a cycle; must be rejected.
     s.set_parent(a, b);
     REQUIRE(s.registry().get<Hierarchy>(a).parent == s.root());
 }

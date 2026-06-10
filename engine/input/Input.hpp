@@ -3,10 +3,11 @@
 #include <array>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include <SDL3/SDL_scancode.h>
+
+#include "engine/core/StringMap.hpp"
 
 union SDL_Event;
 
@@ -45,9 +46,9 @@ class Input {
         std::vector<SDL_Scancode> keys;
     };
 
-    // String map; small N (handful of actions). Linear-scan lookup keeps the
-    // hot query path heterogeneous-friendly without a C++23 transparent hash.
-    std::unordered_map<std::string, Binding> actions_;
+    // Transparent hash: the string_view queries above look up without
+    // allocating a temporary key.
+    StringMap<Binding> actions_;
     std::array<bool, kNumKeys> curr_{};
     std::array<bool, kNumKeys> prev_{};
 };

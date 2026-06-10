@@ -15,7 +15,7 @@ struct SoundHandle {
 // Thin wrapper around miniaudio's ma_engine. Lifetime-owns loaded ma_sound
 // instances; the engine destructor releases them in shutdown().
 //
-// init() may fail (no audio device, driver issue) — the caller should treat
+// init() may fail (no audio device, driver issue); the caller should treat
 // that as a soft failure and continue silently rather than aborting.
 class Audio {
   public:

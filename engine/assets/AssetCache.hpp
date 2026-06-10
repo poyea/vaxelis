@@ -3,9 +3,9 @@
 #include <functional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
+#include "engine/core/StringMap.hpp"
 #include "engine/rhi/Rhi.hpp"
 
 namespace vaxelis {
@@ -45,7 +45,7 @@ class AssetCache {
 
     rhi::IDevice* device_{nullptr};
     FileWatcher* watcher_{nullptr};
-    std::unordered_map<std::string, TexEntry> textures_;
+    StringMap<TexEntry> textures_;
     std::vector<ReloadListener> listeners_;
 };
 

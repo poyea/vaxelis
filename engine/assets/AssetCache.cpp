@@ -62,7 +62,7 @@ void AssetCache::shutdown() {
 rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_view key) {
     if (!device_)
         return {};
-    const std::string k = key.empty() ? std::string(path) : std::string(key);
+    const std::string_view k = key.empty() ? path : key;
     if (auto it = textures_.find(k); it != textures_.end())
         return it->second.handle;
 
@@ -86,9 +86,9 @@ rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_v
         .width = static_cast<uint32_t>(img.w),
         .height = static_cast<uint32_t>(img.h),
     };
-    auto [it, _] = textures_.emplace(k, std::move(e));
+    auto [it, _] = textures_.emplace(std::string(k), std::move(e));
     if (watcher_) {
-        std::string key_copy = k;
+        std::string key_copy(k);
         watcher_->watch(it->second.path,
                         [this, key_copy](const std::string&) { reload_texture(key_copy); });
     }
@@ -96,14 +96,14 @@ rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_v
 }
 
 rhi::TextureHandle AssetCache::get_texture(std::string_view key) const {
-    auto it = textures_.find(std::string(key));
+    auto it = textures_.find(key);
     return (it != textures_.end()) ? it->second.handle : rhi::TextureHandle{};
 }
 
 void AssetCache::reload_texture(std::string_view key) {
     if (!device_)
         return;
-    auto it = textures_.find(std::string(key));
+    auto it = textures_.find(key);
     if (it == textures_.end())
         return;
 
@@ -114,7 +114,7 @@ void AssetCache::reload_texture(std::string_view key) {
     const auto new_w = static_cast<uint32_t>(img.w);
     const auto new_h = static_cast<uint32_t>(img.h);
 
-    // Fast path: same dimensions — upload in place so the handle and GPU object
+    // Fast path: same dimensions; upload in place so the handle and GPU object
     // stay stable. Dependents (e.g. SpriteComponent ids) need no rebinding and
     // listeners are not disturbed.
     if (it->second.handle.valid() && new_w == it->second.width && new_h == it->second.height) {

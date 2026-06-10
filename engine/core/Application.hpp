@@ -24,7 +24,7 @@ struct AppConfig {
 // Owns window + GL context + device + ImGui. Subclass and override the hooks.
 //
 // Two-phase init: the constructor is nothrow and only stores config. Call
-// `init()` to spin up SDL/GL/RHI/ImGui — it returns false on failure with the
+// `init()` to spin up SDL/GL/RHI/ImGui; it returns false on failure with the
 // reason logged. `run()` returns non-zero if init failed.
 class Application {
   public:

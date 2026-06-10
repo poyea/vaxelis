@@ -155,7 +155,7 @@ void Physics2D::sync_from_scene(Scene& scene) {
         auto& tr = view.get<Transform2D>(e);
         if (B2_IS_NULL(rb.body))
             continue;
-        // Skip bodies that haven't moved since our last write — comparing
+        // Skip bodies that haven't moved since our last write; comparing
         // against the exact value we last stored makes this an equality test,
         // not a tolerance one, so the simulation owns untouched dynamic bodies.
         if (tr.position == rb.last_sync_position && tr.rotation == rb.last_sync_rotation)

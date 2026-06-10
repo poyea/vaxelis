@@ -30,7 +30,7 @@ class Scene {
     // Caller adds extra components via registry().emplace<>.
     entt::entity create_node(std::string name, entt::entity parent = entt::null, Uuid uuid = {});
 
-    // Finds the node carrying `uuid`, or entt::null. O(N) scan — intended for
+    // Finds the node carrying `uuid`, or entt::null. O(N) scan, intended for
     // load/merge wiring, not per-frame use.
     entt::entity find_by_uuid(const Uuid& uuid) const;
 

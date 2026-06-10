@@ -1,6 +1,7 @@
 #include "engine/scene/Scene.hpp"
 
 #include <algorithm>
+#include <utility>
 
 #include "engine/renderer/SpriteRenderer.hpp"
 
@@ -147,11 +148,7 @@ void Scene::render_sprites(SpriteBatch& batch) const {
             continue;
         items.push_back({e, s.z_order, s.texture.id});
     }
-    std::stable_sort(items.begin(), items.end(), [](const Item& a, const Item& b) {
-        if (a.z != b.z)
-            return a.z < b.z;
-        return a.tex < b.tex;
-    });
+    std::ranges::stable_sort(items, {}, [](const Item& i) { return std::pair{i.z, i.tex}; });
     for (const auto& it : items) {
         const auto& s = registry_.get<const SpriteComponent>(it.e);
         const auto& w = registry_.get<WorldTransform2D>(it.e).matrix;

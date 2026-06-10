@@ -23,7 +23,7 @@
 
 namespace {
 
-// 64x64 RGBA tile atlas — gids 1..4.
+// 64x64 RGBA tile atlas, gids 1..4.
 std::vector<uint8_t> make_atlas() {
     constexpr uint32_t W = 64, H = 64, C = 32;
     std::vector<uint8_t> px(static_cast<size_t>(W) * H * 4, 0);

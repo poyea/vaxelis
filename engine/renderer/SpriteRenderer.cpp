@@ -13,7 +13,7 @@ namespace {
 
 // GLSL 4.50 core (desktop) and GLSL ES 3.00 (WebGL2/Emscripten) variants. The
 // only differences are the #version line and the fragment shader's required
-// `precision` statement — the attribute layout(location=) qualifiers, plain
+// `precision` statement; the attribute layout(location=) qualifiers, plain
 // uniforms, and unqualified varyings are all valid in both dialects.
 #ifdef __EMSCRIPTEN__
 constexpr std::string_view kVertexSrc = R"(#version 300 es

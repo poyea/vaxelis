@@ -9,7 +9,7 @@ namespace vaxelis {
 enum class BodyType { Static, Kinematic, Dynamic };
 
 // Authoring component for a rigid body. `body` is filled in lazily on first
-// physics step — it's the runtime handle and should not be serialized.
+// physics step; it's the runtime handle and should not be serialized.
 struct RigidBody2D {
     BodyType type{BodyType::Dynamic};
     float linear_damping{0.0f};

@@ -12,7 +12,7 @@ namespace vaxelis {
 // watched path holds a callback that fires when the file's last_write_time
 // changes vs. the previous tick.
 //
-// Designed for editor/dev use — not for production hot paths. Default tick
+// Designed for editor/dev use, not for production hot paths. Default tick
 // interval is 250ms; call tick(dt) every frame.
 class FileWatcher {
   public:

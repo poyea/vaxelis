@@ -94,7 +94,7 @@ bool from_json(Scene& s, std::string_view jtext) {
         return {};
     };
 
-    // Existing uuids (the scene may already hold nodes — from_json appends).
+    // Existing uuids (the scene may already hold nodes; from_json appends).
     // Incoming ids that collide are reminted so merges/instancing stay unique;
     // a load into a fresh scene preserves every stored uuid.
     std::unordered_set<Uuid> used;
@@ -113,7 +113,7 @@ bool from_json(Scene& s, std::string_view jtext) {
         if (token.empty() || token == "#0")
             continue;
         // Adopt the stored uuid unless it is malformed (legacy integer ids),
-        // null, or already taken — create_node mints a fresh one for {}.
+        // null, or already taken; create_node mints a fresh one for {}.
         Uuid uuid = node["id"].is_string() ? uuid_from_string(token) : Uuid{};
         if (uuid.valid() && !used.insert(uuid).second)
             uuid = {}; // collision: let create_node remint
