@@ -2,13 +2,19 @@ name: docs
 
 on:
   workflow_dispatch:
-  # Push trigger disabled: project has no docs target yet; re-enable once
-  # CMakeLists adds Doxygen.
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+# One Pages deploy at a time; queued runs wait rather than cancel a deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build-docs:
@@ -27,7 +33,9 @@ jobs:
             libgl-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libudev-dev libwayland-dev libdecor-0-dev
       - name: Configure docs
-        run: cmake -S . -B build/docs -G Ninja -DCPP_PACKAGE_BOILERPLATE_BUILD_TESTS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=ON
+        # Tests off so configure doesn't fetch googletest; only the docs
+        # target is built, so nothing else gets compiled.
+        run: cmake -S . -B build/docs -G Ninja -DVAXELIS_BUILD_TESTS=OFF -DVAXELIS_BUILD_DOCS=ON
       - name: Build docs
         run: cmake --build build/docs --target docs
       - name: Configure Pages
