@@ -1,11 +1,11 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "engine/scene/Components.hpp"
 #include "engine/scene/Scene.hpp"
 
 using namespace vaxelis;
 
-TEST_CASE("Scene: update_world_transforms composes parent chain into cache") {
+TEST(WorldTransform, UpdateWorldTransformsComposesParentChainIntoCache) {
     Scene s;
     auto a = s.create_node("A");
     auto b = s.create_node("B", a);
@@ -17,11 +17,11 @@ TEST_CASE("Scene: update_world_transforms composes parent chain into cache") {
     s.update_world_transforms();
 
     const auto& wc = s.registry().get<WorldTransform2D>(c).matrix;
-    REQUIRE(wc[3].x == 17.0f);
-    REQUIRE(wc[3].y == 3.0f);
+    EXPECT_FLOAT_EQ(wc[3].x, 17.0f);
+    EXPECT_FLOAT_EQ(wc[3].y, 3.0f);
 }
 
-TEST_CASE("Scene: cached world_matrix matches recursive fallback") {
+TEST(WorldTransform, CachedWorldMatrixMatchesRecursiveFallback) {
     Scene s;
     auto a = s.create_node("A");
     auto b = s.create_node("B", a);
@@ -33,6 +33,6 @@ TEST_CASE("Scene: cached world_matrix matches recursive fallback") {
     const auto walked = s.world_matrix(b);
     s.update_world_transforms();
     const auto cached = s.world_matrix(b);
-    REQUIRE(walked[3].x == cached[3].x);
-    REQUIRE(walked[3].y == cached[3].y);
+    EXPECT_FLOAT_EQ(walked[3].x, cached[3].x);
+    EXPECT_FLOAT_EQ(walked[3].y, cached[3].y);
 }

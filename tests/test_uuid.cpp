@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <unordered_set>
 
@@ -6,37 +6,37 @@
 
 using namespace vaxelis;
 
-TEST_CASE("Uuid: default is null, generated is not") {
-    REQUIRE_FALSE(Uuid{}.valid());
-    REQUIRE(generate_uuid().valid());
+TEST(Uuid, DefaultIsNullGeneratedIsNot) {
+    EXPECT_FALSE(Uuid{}.valid());
+    EXPECT_TRUE(generate_uuid().valid());
 }
 
-TEST_CASE("Uuid: canonical text round-trips") {
+TEST(Uuid, CanonicalTextRoundTrips) {
     auto u = generate_uuid();
     auto text = to_string(u);
-    REQUIRE(text.size() == 36); // 32 hex + 4 dashes
-    REQUIRE(uuid_from_string(text) == u);
+    EXPECT_EQ(text.size(), 36u); // 32 hex + 4 dashes
+    EXPECT_EQ(uuid_from_string(text), u);
 }
 
-TEST_CASE("Uuid: dashes are optional when parsing") {
+TEST(Uuid, DashesAreOptionalWhenParsing) {
     auto u = generate_uuid();
     std::string compact;
     for (char c : to_string(u))
         if (c != '-')
             compact.push_back(c);
-    REQUIRE(uuid_from_string(compact) == u);
+    EXPECT_EQ(uuid_from_string(compact), u);
 }
 
-TEST_CASE("Uuid: malformed text parses to null") {
-    REQUIRE_FALSE(uuid_from_string("not-a-uuid").valid());
-    REQUIRE_FALSE(uuid_from_string("").valid());
-    REQUIRE_FALSE(uuid_from_string("zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz").valid());
+TEST(Uuid, MalformedTextParsesToNull) {
+    EXPECT_FALSE(uuid_from_string("not-a-uuid").valid());
+    EXPECT_FALSE(uuid_from_string("").valid());
+    EXPECT_FALSE(uuid_from_string("zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz").valid());
     // One nibble short.
-    REQUIRE_FALSE(uuid_from_string("0000000-0000-0000-0000-000000000000").valid());
+    EXPECT_FALSE(uuid_from_string("0000000-0000-0000-0000-000000000000").valid());
 }
 
-TEST_CASE("Uuid: generation is collision-free over a batch") {
+TEST(Uuid, GenerationIsCollisionFreeOverABatch) {
     std::unordered_set<Uuid> seen;
     for (int i = 0; i < 10000; ++i)
-        REQUIRE(seen.insert(generate_uuid()).second);
+        EXPECT_TRUE(seen.insert(generate_uuid()).second);
 }

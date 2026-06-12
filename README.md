@@ -50,5 +50,5 @@ ctest --test-dir build --output-on-failure
 ```
 engine/    # the engine library (RHI, scene, physics, scripting, …)
 runtime/   # platformer demo + assets
-tests/     # Catch2 unit tests
+tests/     # GoogleTest unit tests
 ```

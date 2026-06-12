@@ -1,10 +1,10 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include "engine/tilemap/TiledMap.hpp"
 
 using namespace vaxelis;
 
-TEST_CASE("TiledMap: parses inline JSON with one tile layer + one object") {
+TEST(TiledMap, ParsesInlineJsonWithOneTileLayerPlusOneObject) {
     constexpr const char* kJson = R"({
         "width": 3, "height": 2, "tilewidth": 16, "tileheight": 16,
         "tilesets": [
@@ -21,27 +21,27 @@ TEST_CASE("TiledMap: parses inline JSON with one tile layer + one object") {
     })";
 
     TiledMap m;
-    REQUIRE(
+    ASSERT_TRUE(
         tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{42}; }));
 
-    REQUIRE(m.width == 3);
-    REQUIRE(m.height == 2);
-    REQUIRE(m.tile_w == 16);
-    REQUIRE(m.tilesets.size() == 1);
-    REQUIRE(m.tilesets[0].image == "atlas");
-    REQUIRE(m.tilesets[0].texture.id == 42);
+    EXPECT_EQ(m.width, 3);
+    EXPECT_EQ(m.height, 2);
+    EXPECT_EQ(m.tile_w, 16);
+    ASSERT_EQ(m.tilesets.size(), 1u);
+    EXPECT_EQ(m.tilesets[0].image, "atlas");
+    EXPECT_EQ(m.tilesets[0].texture.id, 42u);
 
-    REQUIRE(m.tile_layers.size() == 1);
-    REQUIRE(m.tile_layers[0].gids.size() == 6);
-    REQUIRE(m.tile_layers[0].gids[1] == 1);
+    ASSERT_EQ(m.tile_layers.size(), 1u);
+    ASSERT_EQ(m.tile_layers[0].gids.size(), 6u);
+    EXPECT_EQ(m.tile_layers[0].gids[1], 1u);
 
-    REQUIRE(m.object_groups.size() == 1);
-    REQUIRE(m.object_groups[0].objects.size() == 1);
-    REQUIRE(m.object_groups[0].objects[0].name == "player");
-    REQUIRE(m.object_groups[0].objects[0].pos.x == 8.0f);
+    ASSERT_EQ(m.object_groups.size(), 1u);
+    ASSERT_EQ(m.object_groups[0].objects.size(), 1u);
+    EXPECT_EQ(m.object_groups[0].objects[0].name, "player");
+    EXPECT_FLOAT_EQ(m.object_groups[0].objects[0].pos.x, 8.0f);
 }
 
-TEST_CASE("TiledMap: strips Tiled flip flags from GIDs") {
+TEST(TiledMap, StripsTiledFlipFlagsFromGids) {
     // GID with horizontal-flip bit (0x80000000) set should reduce to 3.
     constexpr const char* kJson = R"({
         "width": 1, "height": 1, "tilewidth": 16, "tileheight": 16,
@@ -49,6 +49,7 @@ TEST_CASE("TiledMap: strips Tiled flip flags from GIDs") {
         "layers": [{"type":"tilelayer","name":"l","width":1,"height":1,"data":[2147483651]}]
     })";
     TiledMap m;
-    REQUIRE(tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{}; }));
-    REQUIRE(m.tile_layers[0].gids[0] == 3u);
+    ASSERT_TRUE(tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{}; }));
+    ASSERT_EQ(m.tile_layers.size(), 1u);
+    EXPECT_EQ(m.tile_layers[0].gids[0], 3u);
 }

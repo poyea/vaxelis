@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
@@ -24,11 +24,11 @@ std::string write_temp_script(const char* tag) {
 }
 } // namespace
 
-TEST_CASE("ScriptHost: destroying an entity tears down its Lua instance") {
+TEST(ScriptHost, DestroyingAnEntityTearsDownItsLuaInstance) {
     Scene s;
     Input in;
     ScriptHost host;
-    REQUIRE(host.init(s, in));
+    ASSERT_TRUE(host.init(s, in));
     host.register_with(s);
 
     auto e = s.create_node("Scripted");
@@ -36,26 +36,26 @@ TEST_CASE("ScriptHost: destroying an entity tears down its Lua instance") {
     sc.path = write_temp_script("destroy");
 
     host.update(1.0f / 60.0f, s);
-    REQUIRE(host.instance_count() == 1);
+    EXPECT_EQ(host.instance_count(), 1u);
 
     const std::string key = s.registry().get<ScriptComponent>(e).instance_key;
-    REQUIRE_FALSE(key.empty());
-    REQUIRE(host.has_instance(key));
+    EXPECT_FALSE(key.empty());
+    EXPECT_TRUE(host.has_instance(key));
 
     s.destroy_node(e);
 
     // The Lua subtable and host bookkeeping must be gone. (We assert via the
     // host's accessors rather than indexing host.lua() directly; sol::state's
     // operator[] needs sol2's full headers, which this TU deliberately avoids.)
-    REQUIRE_FALSE(host.has_instance(key));
-    REQUIRE(host.instance_count() == 0);
+    EXPECT_FALSE(host.has_instance(key));
+    EXPECT_EQ(host.instance_count(), 0u);
 }
 
-TEST_CASE("ScriptHost: erasing the ScriptComponent tears down its Lua instance") {
+TEST(ScriptHost, ErasingTheScriptComponentTearsDownItsLuaInstance) {
     Scene s;
     Input in;
     ScriptHost host;
-    REQUIRE(host.init(s, in));
+    ASSERT_TRUE(host.init(s, in));
     host.register_with(s);
 
     auto e = s.create_node("Scripted");
@@ -63,10 +63,10 @@ TEST_CASE("ScriptHost: erasing the ScriptComponent tears down its Lua instance")
 
     host.update(1.0f / 60.0f, s);
     const std::string key = s.registry().get<ScriptComponent>(e).instance_key;
-    REQUIRE(host.has_instance(key));
+    EXPECT_TRUE(host.has_instance(key));
 
     s.registry().remove<ScriptComponent>(e);
 
-    REQUIRE_FALSE(host.has_instance(key));
-    REQUIRE(host.instance_count() == 0);
+    EXPECT_FALSE(host.has_instance(key));
+    EXPECT_EQ(host.instance_count(), 0u);
 }

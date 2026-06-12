@@ -1,4 +1,4 @@
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 #include <chrono>
 #include <filesystem>
@@ -9,7 +9,7 @@
 
 using namespace vaxelis;
 
-TEST_CASE("FileWatcher: fires callback on mtime change") {
+TEST(FileWatcher, FiresCallbackOnMtimeChange) {
     auto dir = std::filesystem::temp_directory_path() / "vaxelis_fw_test";
     std::filesystem::create_directories(dir);
     auto file = dir / "probe.txt";
@@ -26,7 +26,7 @@ TEST_CASE("FileWatcher: fires callback on mtime change") {
 
     // First tick records baseline mtime; no callback expected.
     w.tick(1.0f);
-    REQUIRE(hits == 0);
+    EXPECT_EQ(hits, 0);
 
     // Sleep past filesystem mtime resolution (~1s on FAT/NTFS in some cases),
     // then rewrite the file.
@@ -36,7 +36,7 @@ TEST_CASE("FileWatcher: fires callback on mtime change") {
         f << "v2";
     }
     w.tick(1.0f);
-    REQUIRE(hits == 1);
+    EXPECT_EQ(hits, 1);
 
     std::filesystem::remove_all(dir);
 }
