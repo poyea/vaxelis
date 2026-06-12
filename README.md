@@ -1,6 +1,6 @@
 # vaxelis [![ci](https://github.com/poyea/vaxelis/actions/workflows/ci.yml/badge.svg)](https://github.com/poyea/vaxelis/actions/workflows/ci.yml)
 
-A C++23 hybrid, cross-platform 2D/3D game engine.
+A C++26 hybrid, cross-platform 2D/3D game engine.
 
 ## Stack
 
@@ -22,7 +22,7 @@ If you forgot `--recursive`:
 git submodule update --init --recursive
 ```
 
-**Toolchain:** GCC 13+, Clang 18+, AppleClang 16+, or MSVC 19.38+ (VS 2022 17.8). CMake 3.28+, Ninja.
+**Toolchain:** GCC 14+, Clang 18+, AppleClang 16+, or MSVC 19.40+ (VS 2022 17.10). CMake 3.30+, Ninja.
 
 **Linux deps:** `libasound2-dev libpulse-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev libxkbcommon-dev libwayland-dev libgl-dev libdbus-1-dev libudev-dev`
 
