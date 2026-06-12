@@ -32,6 +32,15 @@ elseif(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.40)
     message(FATAL_ERROR "MSVC 19.40 or newer required for C++26")
 endif()
 
+# MSVC has no /std:c++26 flag and the CMake/MSVC toolchain on CI doesn't list
+# cxx_std_26 as a known feature yet; /std:c++latest is MSVC's C++26 mode. Map the
+# C++26 standard to it so CMAKE_CXX_STANDARD=26 resolves for every C++ target
+# (ours and third-party).
+if(MSVC)
+    set(CMAKE_CXX26_STANDARD_COMPILE_OPTION "-std:c++latest")
+    set(CMAKE_CXX26_EXTENSION_COMPILE_OPTION "-std:c++latest")
+endif()
+
 include(cmake/CompilerOptions.cmake)
 
 add_subdirectory(third_party)
