@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.30)
 
 project(
     vaxelis
@@ -9,7 +9,7 @@ project(
 include(CTest)
 include(GNUInstallDirs)
 
-set(CMAKE_CXX_STANDARD 23 CACHE STRING "C++ language standard")
+set(CMAKE_CXX_STANDARD 26 CACHE STRING "C++ language standard")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -24,12 +24,12 @@ if(EMSCRIPTEN)
     set(VAXELIS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 endif()
 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 13)
-    message(FATAL_ERROR "GCC 13 or newer required for C++23")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
+    message(FATAL_ERROR "GCC 14 or newer required for C++26")
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18)
-    message(FATAL_ERROR "Clang 18 or newer required for C++23")
-elseif(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.38)
-    message(FATAL_ERROR "MSVC 19.38 or newer required for C++23")
+    message(FATAL_ERROR "Clang 18 or newer required for C++26")
+elseif(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.40)
+    message(FATAL_ERROR "MSVC 19.40 or newer required for C++26")
 endif()
 
 include(cmake/CompilerOptions.cmake)
