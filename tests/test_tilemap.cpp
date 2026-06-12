@@ -49,7 +49,8 @@ TEST(TiledMap, StripsTiledFlipFlagsFromGids) {
         "layers": [{"type":"tilelayer","name":"l","width":1,"height":1,"data":[2147483651]}]
     })";
     TiledMap m;
-    ASSERT_TRUE(tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{}; }));
+    ASSERT_TRUE(
+        tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{}; }));
     ASSERT_EQ(m.tile_layers.size(), 1u);
     EXPECT_EQ(m.tile_layers[0].gids[0], 3u);
 }
