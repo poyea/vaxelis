@@ -33,9 +33,8 @@ jobs:
             libgl-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libudev-dev libwayland-dev libdecor-0-dev
       - name: Configure docs
-        # Tests off so configure doesn't fetch googletest; only the docs
-        # target is built, so nothing else gets compiled. CC/CXX pinned to
-        # gcc-14 since the C++26 floor rejects ubuntu-24.04's default gcc-13.
+        # Tests off so configure doesn't fetch googletest; only the docs target
+        # is built. gcc-14: the default gcc-13 fails the C++26 floor.
         env:
           CC: gcc-14
           CXX: g++-14

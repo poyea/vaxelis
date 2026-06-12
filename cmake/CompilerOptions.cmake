@@ -1,10 +1,7 @@
 include(CheckIPOSupported)
 
 function(vaxelis_apply_target_options target_name)
-    # cxx_std_26 isn't in MSVC's known-feature list in the CMake CI uses, so on
-    # MSVC the standard is requested through the CXX_STANDARD property (mapped to
-    # /std:c++latest in the top-level CMakeLists). The portable meta-feature is
-    # used elsewhere so the requirement propagates to consumers of the engine.
+    # MSVC has no cxx_std_26 feature; request the standard via CXX_STANDARD.
     if(MSVC)
         set_target_properties(${target_name} PROPERTIES
             CXX_STANDARD ${CMAKE_CXX_STANDARD}

@@ -12,11 +12,8 @@ target_link_libraries(vaxelis_tests PRIVATE vaxelis_engine GTest::gtest_main)
 vaxelis_apply_target_options(vaxelis_tests)
 
 include(GoogleTest)
-# The test exe transitively links SDL3 as a shared library, so it needs SDL3.dll
-# at launch. DL_PATHS points the runner at SDL3.dll's build location, and
-# PRE_TEST defers discovery to ctest time — after the POST_BUILD step below has
-# copied SDL3.dll next to the exe — so enumeration doesn't fail with a missing
-# DLL the way build-time (POST_BUILD) discovery would on Windows.
+# PRE_TEST defers discovery to ctest time, after the POST_BUILD copy below has
+# put SDL3.dll next to the exe; DL_PATHS covers the test runs themselves.
 gtest_discover_tests(vaxelis_tests
     DL_PATHS $<TARGET_FILE_DIR:SDL3::SDL3>
     DISCOVERY_MODE PRE_TEST)
