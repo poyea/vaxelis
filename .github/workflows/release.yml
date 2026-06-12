@@ -18,19 +18,25 @@ jobs:
       - name: Install toolchain + SDL deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++ pkg-config \
+          sudo apt-get install -y cmake ninja-build g++-14 pkg-config \
             libasound2-dev libpulse-dev libjack-dev libsndio-dev \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
             libxi-dev libxss-dev libxkbcommon-dev libdrm-dev libgbm-dev \
             libgl-dev libgles2-mesa-dev libegl1-mesa-dev \
             libdbus-1-dev libudev-dev libwayland-dev libdecor-0-dev
       - name: Configure release build
-        run: cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPP_PACKAGE_BOILERPLATE_BUILD_TESTS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_BENCHMARKS=OFF -DCPP_PACKAGE_BOILERPLATE_BUILD_DOCS=OFF
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        run: cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release -DVAXELIS_BUILD_TESTS=OFF
       - name: Build release artifacts
         run: cmake --build build/release --parallel
       - name: Package artifacts
-        run: tar -czf cpp-package-boilerplate-${GITHUB_REF_NAME}.tar.gz -C build/release .
+        # runtime/ holds the exe plus the mirrored assets; bundle libSDL3 with it.
+        run: |
+          cp build/release/third_party/SDL/libSDL3.so* build/release/runtime/
+          tar -czf vaxelis-${GITHUB_REF_NAME}-linux-x86_64.tar.gz -C build/release/runtime .
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: cpp-package-boilerplate-${{ github.ref_name }}.tar.gz
+          files: vaxelis-${{ github.ref_name }}-linux-x86_64.tar.gz
