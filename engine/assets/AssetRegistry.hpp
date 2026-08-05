@@ -27,8 +27,7 @@ namespace vaxelis {
 /// asset with no file behind it at all (procedural textures, generated atlases).
 ///
 /// Neither copyable nor movable: watch callbacks capture `this`.
-template <class T>
-class AssetRegistry {
+template <class T> class AssetRegistry {
     static_assert(std::is_trivially_copyable_v<T>,
                   "asset values are passed and stored by value; keep them trivially copyable");
 
