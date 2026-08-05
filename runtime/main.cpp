@@ -2,13 +2,14 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include <SDL3/SDL_scancode.h>
 #include <imgui.h>
 
 #include "engine/assets/AssetCache.hpp"
+#include "engine/assets/AssetRegistry.hpp"
 #include "engine/assets/FileWatcher.hpp"
 #include "engine/core/Application.hpp"
 #include "engine/core/Log.hpp"
@@ -113,8 +114,21 @@ class Platformer final : public vaxelis::Application {
 
         // Load the SFX cues. Keys match the names passed to play_cue(); a
         // missing/failed file just yields an invalid handle that play() ignores.
+        // Sharing the level watcher means edited .wav files reload like textures.
+        vaxelis::AssetRegistry<vaxelis::SoundHandle>::Ops ops;
+        ops.load = [this](const std::string& p) { return audio().load(p); };
+        ops.reload = [this](const std::string& p, vaxelis::SoundHandle& h) {
+            const auto fresh = audio().load(p);
+            if (!fresh.valid())
+                return false;
+            audio().unload(h);
+            h = fresh;
+            return true;
+        };
+        ops.destroy = [this](vaxelis::SoundHandle h) { audio().unload(h); };
+        cues_.init(std::move(ops), &watcher_);
         for (const char* name : {"jump", "squash", "level-complete", "death", "win-game"}) {
-            cues_[name] = audio().load("assets/audio/" + std::string(name) + ".wav");
+            cues_.load("assets/audio/" + std::string(name) + ".wav", name);
         }
 
         load_level(1);
@@ -214,14 +228,13 @@ class Platformer final : public vaxelis::Application {
         tear_down_level();
         physics_.shutdown();
         batch_.shutdown(device());
+        cues_.shutdown();
         assets_.shutdown();
-        for (auto& [_, h] : procedural_)
-            if (h.valid())
-                device().destroy(h);
-        procedural_.clear();
     }
 
   private:
+    // Uploads pixels we generated ourselves and hands the texture to the cache,
+    // which owns it from here (no separate teardown, one lookup path).
     void register_procedural(const char* key, uint32_t w, uint32_t h,
                              const std::vector<uint8_t>& px) {
         auto handle = device()
@@ -230,12 +243,10 @@ class Platformer final : public vaxelis::Application {
                                            .format = vaxelis::rhi::TextureFormat::RGBA8,
                                            .initial_data = px.data()})
                           .value_or(vaxelis::rhi::TextureHandle{});
-        procedural_[key] = handle;
+        assets_.adopt_texture(key, handle);
     }
 
     vaxelis::rhi::TextureHandle texture_for(const std::string& key) const {
-        if (auto it = procedural_.find(key); it != procedural_.end())
-            return it->second;
         return assets_.get_texture(key);
     }
 
@@ -476,8 +487,7 @@ class Platformer final : public vaxelis::Application {
     // silent no-op.
     void play_cue(const char* name) {
         VX_INFO("[cue] {}", name);
-        if (auto it = cues_.find(name); it != cues_.end())
-            audio().play(it->second);
+        audio().play(cues_.get(name));
     }
 
     vaxelis::SpriteBatch batch_;
@@ -496,8 +506,7 @@ class Platformer final : public vaxelis::Application {
     std::vector<AABB> hazards_;
     AABB goal_{};
 
-    std::unordered_map<std::string, vaxelis::rhi::TextureHandle> procedural_;
-    std::unordered_map<std::string, vaxelis::SoundHandle> cues_;
+    vaxelis::AssetRegistry<vaxelis::SoundHandle> cues_;
 };
 
 } // namespace
