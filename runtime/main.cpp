@@ -169,7 +169,7 @@ class Platformer final : public vaxelis::Application {
 
     void on_render() override {
         batch_.begin(device(), camera_.projection(width(), height()));
-        vaxelis::tiled::render(map_, batch_);
+        vaxelis::tiled::render(map_, batch_, camera_.visible_bounds(width(), height()));
         scene_.render_sprites(batch_);
         batch_.end();
     }

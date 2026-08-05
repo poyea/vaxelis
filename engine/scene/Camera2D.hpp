@@ -15,13 +15,19 @@ struct Camera2D {
     /// See bounds_min.
     vec2 bounds_max{0.0f, 0.0f};
 
+    /// World-space rect the camera covers at this framebuffer size, in pixels.
+    /// Useful for culling; `min` is the top-left corner (y-down).
+    AABB2 visible_bounds(uint32_t screen_w, uint32_t screen_h) const {
+        const float hw = (static_cast<float>(screen_w) * 0.5f) / zoom;
+        const float hh = (static_cast<float>(screen_h) * 0.5f) / zoom;
+        return {{position.x - hw, position.y - hh}, {position.x + hw, position.y + hh}};
+    }
+
     /// Orthographic projection that maps the visible world rect to NDC. Pass
     /// the framebuffer size in pixels.
     mat4 projection(uint32_t screen_w, uint32_t screen_h) const {
-        const float hw = (static_cast<float>(screen_w) * 0.5f) / zoom;
-        const float hh = (static_cast<float>(screen_h) * 0.5f) / zoom;
-        return glm::ortho(position.x - hw, position.x + hw, position.y + hh, position.y - hh, -1.0f,
-                          1.0f);
+        const AABB2 v = visible_bounds(screen_w, screen_h);
+        return glm::ortho(v.min.x, v.max.x, v.max.y, v.min.y, -1.0f, 1.0f);
     }
 
     /// Clamps `position` so the camera's visible rect stays inside [bounds_min,
