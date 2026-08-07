@@ -28,8 +28,9 @@ namespace {
 // call, which is why this stays under the 16383-quad ceiling of u16 indices.
 constexpr uint32_t kSamples = 6000;
 constexpr uint32_t kBatchQuads = 8192;
-constexpr float kSpan = 100.0f;      ///< seconds of pendulum time sampled
-constexpr float kRevealRate = 2400.0f; ///< samples per second while drawing
+/// Seconds of pendulum time sampled, and how fast the pen walks through them.
+constexpr float kSpan = 100.0f;
+constexpr float kRevealRate = 2400.0f;
 constexpr float kTau = 6.2831853f;
 
 /// One pendulum: amplitude is fixed, the panel drives the rest.
