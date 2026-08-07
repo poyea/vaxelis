@@ -29,14 +29,21 @@ constexpr float kAspect = static_cast<float>(kWidth) / static_cast<float>(kHeigh
 constexpr uint32_t kMinIter = 32;
 constexpr uint32_t kMaxIter = 4096;
 
+/// Cycle-detection epsilon. Floats carry about seven digits, so this is as
+/// tight as the test can get while still catching a settled orbit.
+constexpr float kCycleEps = 1e-6f;
+/// How often the periodicity check re-anchors its reference point.
+constexpr uint32_t kRefInterval = 20;
+
 /// Escape-time iteration count for c = (cr, ci), or `max_iter` when the orbit
 /// stays bounded.
 ///
-/// The two closed-form tests up front reject the main cardioid and the period-2
-/// bulb, which is where interior pixels would otherwise burn the entire budget;
-/// that is the difference between a view of the set costing microseconds and
-/// costing milliseconds. The loop itself carries the squares across iterations,
-/// so each step is three multiplies and no redundant squaring.
+/// Three things keep interior pixels from burning the whole budget: closed-form
+/// tests for the main cardioid and the period-2 bulb, and a periodicity check
+/// for the interior those two miss. An interior orbit settles into a cycle, so
+/// once it comes back to a remembered reference point there is nothing left to
+/// learn from iterating. The loop carries z^2 across iterations, so each step is
+/// three multiplies and no redundant squaring.
 uint32_t escape_iterations(float cr, float ci, uint32_t max_iter) {
     const float ci2 = ci * ci;
     const float dx = cr - 0.25f;
@@ -50,12 +57,26 @@ uint32_t escape_iterations(float cr, float ci, uint32_t max_iter) {
     float zi = 0.0f;
     float zr2 = 0.0f;
     float zi2 = 0.0f;
+    float ref_r = 0.0f;
+    float ref_i = 0.0f;
+    uint32_t since_ref = 0;
+
     uint32_t i = 0;
     for (; i < max_iter && zr2 + zi2 <= 4.0f; ++i) {
         zi = 2.0f * zr * zi + ci;
         zr = zr2 - zi2 + cr;
         zr2 = zr * zr;
         zi2 = zi * zi;
+
+        // Integer and compare work here rides alongside the serial float
+        // dependency chain above, so it costs far less than it reads.
+        if (std::fabs(zr - ref_r) < kCycleEps && std::fabs(zi - ref_i) < kCycleEps)
+            return max_iter; // orbit closed on itself: interior
+        if (++since_ref >= kRefInterval) {
+            since_ref = 0;
+            ref_r = zr;
+            ref_i = zi;
+        }
     }
     return i;
 }
