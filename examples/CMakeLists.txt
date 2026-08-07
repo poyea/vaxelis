@@ -19,3 +19,4 @@ endfunction()
 
 vaxelis_add_example(mandelbrot)
 vaxelis_add_example(harmonograph)
+vaxelis_add_example(orbits)
