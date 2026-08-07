@@ -15,13 +15,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(VAXELIS_BUILD_RUNTIME "Build the runtime executable" ON)
+option(VAXELIS_BUILD_EXAMPLES "Build the example programs" ON)
 option(VAXELIS_BUILD_TESTS "Build unit tests" ${BUILD_TESTING})
 option(VAXELIS_ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
 option(VAXELIS_BUILD_DOCS "Build API documentation with Doxygen" OFF)
 
 # The Catch2 host tests have no runner in the browser; force them off for web.
+# The examples are desktop-only too: each would need its own shell page and
+# preload wiring, which only the runtime target carries.
 if(EMSCRIPTEN)
     set(VAXELIS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(VAXELIS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
@@ -45,6 +49,10 @@ add_subdirectory(engine)
 
 if(VAXELIS_BUILD_RUNTIME)
     add_subdirectory(runtime)
+endif()
+
+if(VAXELIS_BUILD_EXAMPLES)
+    add_subdirectory(examples)
 endif()
 
 if(VAXELIS_BUILD_TESTS)
