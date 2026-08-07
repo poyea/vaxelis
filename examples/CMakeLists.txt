@@ -18,3 +18,4 @@ function(vaxelis_add_example name)
 endfunction()
 
 vaxelis_add_example(mandelbrot)
+vaxelis_add_example(harmonograph)
