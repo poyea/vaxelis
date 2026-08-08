@@ -14,17 +14,17 @@ class SceneInspector {
     void draw(Scene& scene);
 
     /// Currently selected entity, or entt::null.
-    entt::entity selected() const { return selected_; }
+    entt::entity selected() const { return m_selected; }
     /// Changes the selection programmatically.
-    void select(entt::entity e) { selected_ = e; }
+    void select(entt::entity e) { m_selected = e; }
 
   private:
     void draw_hierarchy(Scene& scene);
     void draw_node_recursive(Scene& scene, entt::entity e);
     void draw_properties(Scene& scene);
 
-    entt::entity selected_{entt::null};
-    entt::entity pending_destroy_{entt::null};
+    entt::entity m_selected{entt::null};
+    entt::entity m_pending_destroy{entt::null};
 };
 
 } // namespace vaxelis

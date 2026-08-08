@@ -87,8 +87,8 @@ class Mandelbrot final : public vaxelis::Application {
 
   protected:
     void on_init() override {
-        assets_.init(device());
-        pixels_.resize(static_cast<size_t>(kWidth) * kHeight);
+        m_assets.init(device());
+        m_pixels.resize(static_cast<size_t>(kWidth) * kHeight);
         build_palette();
 
         const auto tex = device()
@@ -97,8 +97,8 @@ class Mandelbrot final : public vaxelis::Application {
                                               .format = vaxelis::rhi::TextureFormat::RGBA8,
                                               .initial_data = nullptr})
                              .value_or(vaxelis::rhi::TextureHandle{});
-        texture_ = assets_.adopt_texture("fractal", tex);
-        if (!batch_.init(device()))
+        m_texture = m_assets.adopt_texture("fractal", tex);
+        if (!m_batch.init(device()))
             VX_ERROR("SpriteBatch init failed");
 
         input().bind_action("pan_left", {SDL_SCANCODE_A, SDL_SCANCODE_LEFT});
@@ -118,14 +118,14 @@ class Mandelbrot final : public vaxelis::Application {
         bool changed = false;
 
         // Pan in view-space units so the apparent speed is zoom-independent.
-        const float step = 0.9f * dt * half_height_;
+        const float step = 0.9f * dt * m_half_height;
         vaxelis::vec2 pan{0.0f, 0.0f};
         pan.x -= input().down("pan_left") ? step : 0.0f;
         pan.x += input().down("pan_right") ? step : 0.0f;
         pan.y -= input().down("pan_up") ? step : 0.0f;
         pan.y += input().down("pan_down") ? step : 0.0f;
         if (pan.x != 0.0f || pan.y != 0.0f) {
-            center_ += pan;
+            m_center += pan;
             changed = true;
         }
 
@@ -134,22 +134,22 @@ class Mandelbrot final : public vaxelis::Application {
         zoom -= input().down("zoom_in") ? 1.2f * dt : 0.0f;
         zoom += input().down("zoom_out") ? 1.2f * dt : 0.0f;
         if (zoom != 0.0f) {
-            half_height_ *= std::exp(zoom);
+            m_half_height *= std::exp(zoom);
             changed = true;
         }
 
-        if (input().pressed("iter_up") && max_iter_ < kMaxIter) {
-            max_iter_ *= 2;
+        if (input().pressed("iter_up") && m_max_iter < kMaxIter) {
+            m_max_iter *= 2;
             changed = true;
         }
-        if (input().pressed("iter_down") && max_iter_ > kMinIter) {
-            max_iter_ /= 2;
+        if (input().pressed("iter_down") && m_max_iter > kMinIter) {
+            m_max_iter /= 2;
             changed = true;
         }
         if (input().pressed("reset")) {
-            center_ = {-0.6f, 0.0f};
-            half_height_ = 1.2f;
-            max_iter_ = 256;
+            m_center = {-0.6f, 0.0f};
+            m_half_height = 1.2f;
+            m_max_iter = 256;
             changed = true;
         }
 
@@ -159,18 +159,18 @@ class Mandelbrot final : public vaxelis::Application {
     }
 
     void on_render() override {
-        batch_.begin(device(), width(), height());
+        m_batch.begin(device(), width(), height());
         const vaxelis::vec2 size{static_cast<float>(width()), static_cast<float>(height())};
-        batch_.draw(texture_, size * 0.5f, size);
-        batch_.end();
+        m_batch.draw(m_texture, size * 0.5f, size);
+        m_batch.end();
     }
 
     void on_imgui() override {
         ImGui::Begin("Mandelbrot");
-        ImGui::Text("center  %.9f, %.9f", static_cast<double>(center_.x),
-                    static_cast<double>(center_.y));
-        ImGui::Text("scale   %.3e", static_cast<double>(half_height_));
-        ImGui::Text("iters   %u", max_iter_);
+        ImGui::Text("center  %.9f, %.9f", static_cast<double>(m_center.x),
+                    static_cast<double>(m_center.y));
+        ImGui::Text("scale   %.3e", static_cast<double>(m_half_height));
+        ImGui::Text("iters   %u", m_max_iter);
         ImGui::Text("buffer  %ux%u", kWidth, kHeight);
         ImGui::Separator();
         ImGui::Text("WASD/arrows pan  -  Q/E zoom  -  [ ] iters  -  R reset");
@@ -178,19 +178,19 @@ class Mandelbrot final : public vaxelis::Application {
     }
 
     void on_shutdown() override {
-        batch_.shutdown(device());
-        assets_.shutdown();
+        m_batch.shutdown(device());
+        m_assets.shutdown();
     }
 
   private:
     /// Cyclic cosine gradient, evaluated once so the inner loop is a lookup.
     void build_palette() {
-        for (uint32_t i = 0; i < palette_.size(); ++i) {
-            const float t = static_cast<float>(i) / static_cast<float>(palette_.size());
+        for (uint32_t i = 0; i < m_palette.size(); ++i) {
+            const float t = static_cast<float>(i) / static_cast<float>(m_palette.size());
             const float r = 0.5f + 0.5f * std::cos(6.2831853f * (t + 0.00f));
             const float g = 0.5f + 0.5f * std::cos(6.2831853f * (t + 0.33f));
             const float b = 0.5f + 0.5f * std::cos(6.2831853f * (t + 0.67f));
-            palette_[i] = pack_rgba(r, g, b);
+            m_palette[i] = pack_rgba(r, g, b);
         }
     }
 
@@ -206,47 +206,47 @@ class Mandelbrot final : public vaxelis::Application {
     /// Rasterizes the whole buffer and uploads it in place. Called only when the
     /// view changed, never on an idle frame.
     void rasterize() {
-        const float half_w = half_height_ * kAspect;
+        const float half_w = m_half_height * kAspect;
         const float dx = (2.0f * half_w) / static_cast<float>(kWidth);
-        const float dy = (2.0f * half_height_) / static_cast<float>(kHeight);
-        const float left = center_.x - half_w;
-        const float top = center_.y - half_height_;
+        const float dy = (2.0f * m_half_height) / static_cast<float>(kHeight);
+        const float left = m_center.x - half_w;
+        const float top = m_center.y - m_half_height;
         // Escaped pixels spread over the whole palette whatever the budget, so
         // the banding rescales with the detail. Reciprocal once, not a division
         // per pixel.
-        const float to_palette = 255.0f / static_cast<float>(max_iter_);
+        const float to_palette = 255.0f / static_cast<float>(m_max_iter);
 
         for (uint32_t py = 0; py < kHeight; ++py) {
             const float ci = top + static_cast<float>(py) * dy;
-            uint32_t* row = pixels_.data() + static_cast<size_t>(py) * kWidth;
+            uint32_t* row = m_pixels.data() + static_cast<size_t>(py) * kWidth;
             for (uint32_t px = 0; px < kWidth; ++px) {
                 const float cr = left + static_cast<float>(px) * dx;
-                const uint32_t it = escape_iterations(cr, ci, max_iter_);
-                if (it >= max_iter_) {
+                const uint32_t it = escape_iterations(cr, ci, m_max_iter);
+                if (it >= m_max_iter) {
                     row[px] = 0xFF000000u; // interior
                     continue;
                 }
-                row[px] = palette_[static_cast<uint32_t>(static_cast<float>(it) * to_palette)];
+                row[px] = m_palette[static_cast<uint32_t>(static_cast<float>(it) * to_palette)];
             }
         }
 
-        device().update_texture(texture_, {.x = 0,
-                                           .y = 0,
-                                           .width = kWidth,
-                                           .height = kHeight,
-                                           .data = pixels_.data()});
+        device().update_texture(m_texture, {.x = 0,
+                                            .y = 0,
+                                            .width = kWidth,
+                                            .height = kHeight,
+                                            .data = m_pixels.data()});
     }
 
-    vaxelis::SpriteBatch batch_;
-    vaxelis::AssetCache assets_;
-    vaxelis::rhi::TextureHandle texture_{};
+    vaxelis::SpriteBatch m_batch;
+    vaxelis::AssetCache m_assets;
+    vaxelis::rhi::TextureHandle m_texture{};
 
-    std::vector<uint32_t> pixels_;
-    std::array<uint32_t, 256> palette_{};
+    std::vector<uint32_t> m_pixels;
+    std::array<uint32_t, 256> m_palette{};
 
-    vaxelis::vec2 center_{-0.6f, 0.0f};
-    float half_height_{1.2f};
-    uint32_t max_iter_{256};
+    vaxelis::vec2 m_center{-0.6f, 0.0f};
+    float m_half_height{1.2f};
+    uint32_t m_max_iter{256};
 };
 
 } // namespace

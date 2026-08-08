@@ -54,9 +54,9 @@ class Input {
 
     // Transparent hash: the string_view queries above look up without
     // allocating a temporary key.
-    StringMap<Binding> actions_;
-    std::array<bool, kNumKeys> curr_{};
-    std::array<bool, kNumKeys> prev_{};
+    StringMap<Binding> m_actions;
+    std::array<bool, kNumKeys> m_curr{};
+    std::array<bool, kNumKeys> m_prev{};
 };
 
 } // namespace vaxelis

@@ -31,24 +31,24 @@ struct GLBuffer {
 class GLDevice final : public IDevice {
   public:
     GLDevice() {
-        gl().GenVertexArrays(1, &vao_);
-        gl().BindVertexArray(vao_);
-        VX_INFO("GLDevice: created (VAO={})", vao_);
+        gl().GenVertexArrays(1, &m_vao);
+        gl().BindVertexArray(m_vao);
+        VX_INFO("GLDevice: created (VAO={})", m_vao);
     }
 
     ~GLDevice() override {
         // Tear down any handles the user forgot to destroy, but assert in debug
         // so leaks are noisy.
-        assert(textures_.empty() && "GLDevice: texture handles leaked");
-        assert(shaders_.empty() && "GLDevice: shader handles leaked");
-        assert(buffers_.empty() && "GLDevice: buffer handles leaked");
-        for (auto& [_, t] : textures_)
+        assert(m_textures.empty() && "GLDevice: texture handles leaked");
+        assert(m_shaders.empty() && "GLDevice: shader handles leaked");
+        assert(m_buffers.empty() && "GLDevice: buffer handles leaked");
+        for (auto& [_, t] : m_textures)
             gl().DeleteTextures(1, &t.name);
-        for (auto& [_, s] : shaders_)
+        for (auto& [_, s] : m_shaders)
             gl().DeleteProgram(s.program);
-        for (auto& [_, b] : buffers_)
+        for (auto& [_, b] : m_buffers)
             gl().DeleteBuffers(1, &b.name);
-        gl().DeleteVertexArrays(1, &vao_);
+        gl().DeleteVertexArrays(1, &m_vao);
         VX_INFO("GLDevice: destroyed");
     }
 
@@ -66,8 +66,8 @@ class GLDevice final : public IDevice {
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        TextureHandle h{next_handle_++};
-        textures_.emplace(h.id, GLTexture{name, d.width, d.height});
+        TextureHandle h{m_next_handle++};
+        m_textures.emplace(h.id, GLTexture{name, d.width, d.height});
         return h;
     }
 
@@ -120,9 +120,9 @@ class GLDevice final : public IDevice {
                         gl().DeleteProgram(prog);
                         return vaxelis::unexpected(RhiError::ProgramLinkFailed);
                     }
-                    ShaderHandle h{next_handle_++};
-                    shaders_.emplace(h.id, GLShader{prog, gl().GetUniformLocation(prog, "u_mvp"),
-                                                    gl().GetUniformLocation(prog, "u_tex")});
+                    ShaderHandle h{m_next_handle++};
+                    m_shaders.emplace(h.id, GLShader{prog, gl().GetUniformLocation(prog, "u_mvp"),
+                                                     gl().GetUniformLocation(prog, "u_tex")});
                     return h;
                 });
         });
@@ -135,37 +135,37 @@ class GLDevice final : public IDevice {
         gl().GenBuffers(1, &name);
         gl().BindBuffer(target, name);
         gl().BufferData(target, static_cast<GLsizeiptr>(d.size_bytes), d.initial_data, usage);
-        BufferHandle h{next_handle_++};
-        buffers_.emplace(h.id, GLBuffer{name, target, usage, d.size_bytes});
+        BufferHandle h{m_next_handle++};
+        m_buffers.emplace(h.id, GLBuffer{name, target, usage, d.size_bytes});
         return h;
     }
 
     void destroy(TextureHandle h) override {
-        auto it = textures_.find(h.id);
-        if (it == textures_.end())
+        auto it = m_textures.find(h.id);
+        if (it == m_textures.end())
             return;
         gl().DeleteTextures(1, &it->second.name);
-        textures_.erase(it);
+        m_textures.erase(it);
     }
     void destroy(ShaderHandle h) override {
-        auto it = shaders_.find(h.id);
-        if (it == shaders_.end())
+        auto it = m_shaders.find(h.id);
+        if (it == m_shaders.end())
             return;
         gl().DeleteProgram(it->second.program);
-        shaders_.erase(it);
+        m_shaders.erase(it);
     }
     void destroy(BufferHandle h) override {
-        auto it = buffers_.find(h.id);
-        if (it == buffers_.end())
+        auto it = m_buffers.find(h.id);
+        if (it == m_buffers.end())
             return;
         gl().DeleteBuffers(1, &it->second.name);
-        buffers_.erase(it);
+        m_buffers.erase(it);
     }
 
     void update_buffer(BufferHandle h, std::span<const std::byte> data,
                        size_t offset_bytes) override {
-        auto it = buffers_.find(h.id);
-        if (it == buffers_.end())
+        auto it = m_buffers.find(h.id);
+        if (it == m_buffers.end())
             return;
         gl().BindBuffer(it->second.target, it->second.name);
         gl().BufferSubData(it->second.target, static_cast<GLintptr>(offset_bytes),
@@ -173,8 +173,8 @@ class GLDevice final : public IDevice {
     }
 
     void update_texture(TextureHandle h, const TextureUpdate& u) override {
-        auto it = textures_.find(h.id);
-        if (it == textures_.end())
+        auto it = m_textures.find(h.id);
+        if (it == m_textures.end())
             return;
         if (u.data == nullptr || u.width == 0 || u.height == 0)
             return;
@@ -205,12 +205,12 @@ class GLDevice final : public IDevice {
                            TextureHandle tex, const mat4& proj) override {
         if (index_count == 0)
             return;
-        auto s_it = shaders_.find(sh.id);
-        auto v_it = buffers_.find(vb.id);
-        auto i_it = buffers_.find(ib.id);
-        auto t_it = textures_.find(tex.id);
-        if (s_it == shaders_.end() || v_it == buffers_.end() || i_it == buffers_.end() ||
-            t_it == textures_.end()) {
+        auto s_it = m_shaders.find(sh.id);
+        auto v_it = m_buffers.find(vb.id);
+        auto i_it = m_buffers.find(ib.id);
+        auto t_it = m_textures.find(tex.id);
+        if (s_it == m_shaders.end() || v_it == m_buffers.end() || i_it == m_buffers.end() ||
+            t_it == m_textures.end()) {
             VX_ERROR("draw_sprite_batch: invalid handle");
             return;
         }
@@ -219,7 +219,7 @@ class GLDevice final : public IDevice {
         gl().Uniform1i(s_it->second.tex_loc, 0);
         gl().ActiveTexture(GL_TEXTURE0);
         gl().BindTexture(GL_TEXTURE_2D, t_it->second.name);
-        gl().BindVertexArray(vao_);
+        gl().BindVertexArray(m_vao);
         gl().BindBuffer(GL_ARRAY_BUFFER, v_it->second.name);
         // pos(vec2)+uv(vec2)+color(vec4), interleaved, stride = 32
         gl().VertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 32, reinterpret_cast<void*>(0));
@@ -234,11 +234,11 @@ class GLDevice final : public IDevice {
     }
 
   private:
-    GLuint vao_{0};
-    uint32_t next_handle_{1};
-    std::unordered_map<uint32_t, GLTexture> textures_;
-    std::unordered_map<uint32_t, GLShader> shaders_;
-    std::unordered_map<uint32_t, GLBuffer> buffers_;
+    GLuint m_vao{0};
+    uint32_t m_next_handle{1};
+    std::unordered_map<uint32_t, GLTexture> m_textures;
+    std::unordered_map<uint32_t, GLShader> m_shaders;
+    std::unordered_map<uint32_t, GLBuffer> m_buffers;
 };
 
 } // namespace

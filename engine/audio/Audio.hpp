@@ -31,7 +31,7 @@ class Audio {
     /// Releases all loaded sounds and stops the engine.
     void shutdown();
     /// True after a successful init().
-    bool ready() const { return inited_; }
+    bool ready() const { return m_inited; }
 
     /// Loads a sound from disk. Currently keeps the whole sound resident; for
     /// long files we'll switch to streaming later.
@@ -46,13 +46,13 @@ class Audio {
 
     /// Sets the engine-wide volume (1.0 = unity gain).
     void set_master_volume(float v);
-    float master_volume() const { return master_volume_; }
+    float master_volume() const { return m_master_volume; }
 
   private:
     struct Impl;
-    std::unique_ptr<Impl> impl_;
-    bool inited_{false};
-    float master_volume_{1.0f};
+    std::unique_ptr<Impl> m_impl;
+    bool m_inited{false};
+    float m_master_volume{1.0f};
 };
 
 } // namespace vaxelis

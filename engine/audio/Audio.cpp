@@ -31,83 +31,83 @@ struct Audio::Impl {
     uint32_t next_id{1};
 };
 
-Audio::Audio() : impl_(std::make_unique<Impl>()) {
+Audio::Audio() : m_impl(std::make_unique<Impl>()) {
 }
 Audio::~Audio() {
     shutdown();
 }
 
 bool Audio::init() {
-    if (inited_)
+    if (m_inited)
         return true;
-    if (ma_engine_init(nullptr, &impl_->engine) != MA_SUCCESS) {
+    if (ma_engine_init(nullptr, &m_impl->engine) != MA_SUCCESS) {
         VX_ERROR("Audio: ma_engine_init failed");
         return false;
     }
-    inited_ = true;
-    set_master_volume(master_volume_);
+    m_inited = true;
+    set_master_volume(m_master_volume);
     VX_INFO("Audio: initialized");
     return true;
 }
 
 void Audio::shutdown() {
-    if (!inited_)
+    if (!m_inited)
         return;
-    for (auto& [_, s] : impl_->sounds)
+    for (auto& [_, s] : m_impl->sounds)
         ma_sound_uninit(s.get());
-    impl_->sounds.clear();
-    ma_engine_uninit(&impl_->engine);
-    inited_ = false;
+    m_impl->sounds.clear();
+    ma_engine_uninit(&m_impl->engine);
+    m_inited = false;
 }
 
 SoundHandle Audio::load(std::string_view path) {
-    if (!inited_)
+    if (!m_inited)
         return {};
     auto sound = std::make_unique<ma_sound>();
     const std::string p(path);
-    if (ma_sound_init_from_file(&impl_->engine, p.c_str(), 0, nullptr, nullptr, sound.get()) !=
+    if (ma_sound_init_from_file(&m_impl->engine, p.c_str(), 0, nullptr, nullptr, sound.get()) !=
         MA_SUCCESS) {
         VX_ERROR("Audio: failed to load {}", p);
         return {};
     }
-    const uint32_t id = impl_->next_id++;
-    impl_->sounds.emplace(id, std::move(sound));
+    const uint32_t id = m_impl->next_id++;
+    m_impl->sounds.emplace(id, std::move(sound));
     return SoundHandle{id};
 }
 
 void Audio::unload(SoundHandle h) {
-    if (!inited_ || !h.valid())
+    if (!m_inited || !h.valid())
         return;
-    auto it = impl_->sounds.find(h.id);
-    if (it == impl_->sounds.end())
+    auto it = m_impl->sounds.find(h.id);
+    if (it == m_impl->sounds.end())
         return;
     ma_sound_uninit(it->second.get());
-    impl_->sounds.erase(it);
+    m_impl->sounds.erase(it);
 }
 
 void Audio::play(SoundHandle h) {
-    if (!inited_)
+    if (!m_inited)
         return;
-    auto it = impl_->sounds.find(h.id);
-    if (it == impl_->sounds.end())
+    auto it = m_impl->sounds.find(h.id);
+    if (it == m_impl->sounds.end())
         return;
     ma_sound_seek_to_pcm_frame(it->second.get(), 0);
     ma_sound_start(it->second.get());
 }
 
 void Audio::stop(SoundHandle h) {
-    if (!inited_)
+    if (!m_inited)
         return;
-    auto it = impl_->sounds.find(h.id);
-    if (it == impl_->sounds.end())
+    auto it = m_impl->sounds.find(h.id);
+    if (it == m_impl->sounds.end())
         return;
     ma_sound_stop(it->second.get());
 }
 
 void Audio::set_master_volume(float v) {
-    master_volume_ = v;
-    if (inited_)
-        ma_engine_set_volume(&impl_->engine, v);
+    m_master_volume = v;
+    if (m_inited)
+        ma_engine_set_volume(&m_impl->engine, v);
 }
 
 } // namespace vaxelis

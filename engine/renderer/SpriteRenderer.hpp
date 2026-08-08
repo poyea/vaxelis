@@ -40,9 +40,9 @@ class SpriteBatch {
               vec4 uv_rect /* min_u, min_v, max_u, max_v */, vec4 color);
 
     /// Draw calls submitted in the most recently ended frame.
-    uint32_t draw_calls() const { return last_draw_calls_; }
+    uint32_t draw_calls() const { return m_last_draw_calls; }
     /// Quads drawn in the most recently ended frame.
-    uint32_t quads() const { return last_quads_; }
+    uint32_t quads() const { return m_last_quads; }
 
   private:
     struct Vertex {
@@ -53,20 +53,20 @@ class SpriteBatch {
 
     void flush();
 
-    rhi::IDevice* device_{nullptr};
-    rhi::ShaderHandle shader_{};
-    rhi::BufferHandle vb_{};
-    rhi::BufferHandle ib_{};
-    uint32_t max_quads_{0};
-    std::vector<Vertex> verts_;
-    rhi::TextureHandle current_tex_{};
-    mat4 proj_{1.0f};
-    bool in_frame_{false};
+    rhi::IDevice* m_device{nullptr};
+    rhi::ShaderHandle m_shader{};
+    rhi::BufferHandle m_vb{};
+    rhi::BufferHandle m_ib{};
+    uint32_t m_max_quads{0};
+    std::vector<Vertex> m_verts;
+    rhi::TextureHandle m_current_tex{};
+    mat4 m_proj{1.0f};
+    bool m_in_frame{false};
 
-    uint32_t draw_calls_{0};
-    uint32_t quads_{0};
-    uint32_t last_draw_calls_{0};
-    uint32_t last_quads_{0};
+    uint32_t m_draw_calls{0};
+    uint32_t m_quads{0};
+    uint32_t m_last_draw_calls{0};
+    uint32_t m_last_quads{0};
 };
 
 } // namespace vaxelis

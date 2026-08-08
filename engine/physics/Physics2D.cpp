@@ -28,25 +28,25 @@ bool Physics2D::init() {
 }
 
 bool Physics2D::init(const Config& cfg) {
-    cfg_ = cfg;
-    ppm_ = cfg.pixels_per_meter > 0.0f ? cfg.pixels_per_meter : 100.0f;
-    inv_ppm_ = 1.0f / ppm_;
+    m_cfg = cfg;
+    m_ppm = cfg.pixels_per_meter > 0.0f ? cfg.pixels_per_meter : 100.0f;
+    m_inv_ppm = 1.0f / m_ppm;
 
     b2WorldDef wd = b2DefaultWorldDef();
-    wd.gravity = {cfg.gravity.x * inv_ppm_, cfg.gravity.y * inv_ppm_};
-    world_ = b2CreateWorld(&wd);
-    if (!b2World_IsValid(world_)) {
+    wd.gravity = {cfg.gravity.x * m_inv_ppm, cfg.gravity.y * m_inv_ppm};
+    m_world = b2CreateWorld(&wd);
+    if (!b2World_IsValid(m_world)) {
         VX_ERROR("Physics2D: b2CreateWorld failed");
         return false;
     }
-    VX_INFO("Physics2D: world created (ppm={}, sub_steps={})", ppm_, cfg.sub_steps);
+    VX_INFO("Physics2D: world created (ppm={}, sub_steps={})", m_ppm, cfg.sub_steps);
     return true;
 }
 
 void Physics2D::shutdown() {
-    if (b2World_IsValid(world_)) {
-        b2DestroyWorld(world_);
-        world_ = b2_nullWorldId;
+    if (b2World_IsValid(m_world)) {
+        b2DestroyWorld(m_world);
+        m_world = b2_nullWorldId;
     }
 }
 
@@ -57,7 +57,7 @@ void Physics2D::register_with(Scene& scene) {
 }
 
 void Physics2D::on_rb_destroyed(entt::registry& reg, entt::entity e) {
-    if (!b2World_IsValid(world_))
+    if (!b2World_IsValid(m_world))
         return;
     auto& rb = reg.get<RigidBody2D>(e);
     if (B2_IS_NULL(rb.body))
@@ -72,7 +72,7 @@ void Physics2D::on_rb_destroyed(entt::registry& reg, entt::entity e) {
 }
 
 void Physics2D::on_col_destroyed(entt::registry& reg, entt::entity e) {
-    if (!b2World_IsValid(world_))
+    if (!b2World_IsValid(m_world))
         return;
     auto& col = reg.get<BoxCollider2D>(e);
     if (B2_IS_NULL(col.shape))
@@ -82,13 +82,13 @@ void Physics2D::on_col_destroyed(entt::registry& reg, entt::entity e) {
 }
 
 void Physics2D::step(float dt) {
-    if (!b2World_IsValid(world_))
+    if (!b2World_IsValid(m_world))
         return;
-    b2World_Step(world_, dt, cfg_.sub_steps);
+    b2World_Step(m_world, dt, m_cfg.sub_steps);
 }
 
 void Physics2D::sync_to_scene(Scene& scene) {
-    if (!b2World_IsValid(world_))
+    if (!b2World_IsValid(m_world))
         return;
     auto& reg = scene.registry();
 
@@ -101,13 +101,13 @@ void Physics2D::sync_to_scene(Scene& scene) {
         if (B2_IS_NULL(rb.body)) {
             b2BodyDef bd = b2DefaultBodyDef();
             bd.type = to_b2(rb.type);
-            bd.position = {tr.position.x * inv_ppm_, tr.position.y * inv_ppm_};
+            bd.position = {tr.position.x * m_inv_ppm, tr.position.y * m_inv_ppm};
             bd.rotation = b2MakeRot(tr.rotation);
             bd.linearDamping = rb.linear_damping;
             bd.angularDamping = rb.angular_damping;
             bd.motionLocks.angularZ = rb.fixed_rotation;
             bd.gravityScale = rb.gravity_scale;
-            rb.body = b2CreateBody(world_, &bd);
+            rb.body = b2CreateBody(m_world, &bd);
             rb.last_sync_position = tr.position;
             rb.last_sync_rotation = tr.rotation;
         }
@@ -120,8 +120,8 @@ void Physics2D::sync_to_scene(Scene& scene) {
                 sd.isSensor = col->is_sensor;
                 // Box2D wants half-extents in meters around a centered point.
                 b2Polygon poly = b2MakeOffsetBox(
-                    col->half_extents.x * inv_ppm_, col->half_extents.y * inv_ppm_,
-                    {col->offset.x * inv_ppm_, col->offset.y * inv_ppm_}, b2Rot_identity);
+                    col->half_extents.x * m_inv_ppm, col->half_extents.y * m_inv_ppm,
+                    {col->offset.x * m_inv_ppm, col->offset.y * m_inv_ppm}, b2Rot_identity);
                 col->shape = b2CreatePolygonShape(rb.body, &sd, &poly);
             }
         }
@@ -138,7 +138,7 @@ void Physics2D::sync_to_scene(Scene& scene) {
             continue;
         const b2Vec2 p = b2Body_GetPosition(rb.body);
         const b2Rot rt = b2Body_GetRotation(rb.body);
-        tr.position = {p.x * ppm_, p.y * ppm_};
+        tr.position = {p.x * m_ppm, p.y * m_ppm};
         tr.rotation = b2Rot_GetAngle(rt);
         rb.last_sync_position = tr.position;
         rb.last_sync_rotation = tr.rotation;
@@ -146,7 +146,7 @@ void Physics2D::sync_to_scene(Scene& scene) {
 }
 
 void Physics2D::sync_from_scene(Scene& scene) {
-    if (!b2World_IsValid(world_))
+    if (!b2World_IsValid(m_world))
         return;
     auto& reg = scene.registry();
     auto view = reg.view<RigidBody2D, Transform2D>();
@@ -160,7 +160,7 @@ void Physics2D::sync_from_scene(Scene& scene) {
         // not a tolerance one, so the simulation owns untouched dynamic bodies.
         if (tr.position == rb.last_sync_position && tr.rotation == rb.last_sync_rotation)
             continue;
-        b2Body_SetTransform(rb.body, b2Vec2{tr.position.x * inv_ppm_, tr.position.y * inv_ppm_},
+        b2Body_SetTransform(rb.body, b2Vec2{tr.position.x * m_inv_ppm, tr.position.y * m_inv_ppm},
                             b2MakeRot(tr.rotation));
         if (rb.type == BodyType::Dynamic)
             b2Body_SetAwake(rb.body, true);

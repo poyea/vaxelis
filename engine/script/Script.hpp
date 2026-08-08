@@ -57,7 +57,7 @@ class ScriptHost {
     void on_script_destroyed(entt::registry& reg, entt::entity e);
 
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::unique_ptr<Impl> m_impl;
 };
 
 /// Per-entity component. `path` is the .lua file; `loaded` tracks whether the

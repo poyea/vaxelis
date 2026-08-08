@@ -21,10 +21,10 @@ class Scene {
     Scene();
 
     /// Direct registry access; see the class note about hierarchy invariants.
-    entt::registry& registry() { return registry_; }
-    const entt::registry& registry() const { return registry_; }
+    entt::registry& registry() { return m_registry; }
+    const entt::registry& registry() const { return m_registry; }
     /// The implicit root entity that parents all top-level nodes.
-    entt::entity root() const { return root_; }
+    entt::entity root() const { return m_root; }
 
     /// Creates a node with an Id + Name + Hierarchy + Transform2D. Parent
     /// defaults to root. A fresh Uuid is generated unless `uuid` is valid, in
@@ -66,8 +66,8 @@ class Scene {
     void destroy_recursive(entt::entity e);
     void detach_from_parent(entt::entity e);
 
-    entt::registry registry_;
-    entt::entity root_{entt::null};
+    entt::registry m_registry;
+    entt::entity m_root{entt::null};
 };
 
 } // namespace vaxelis

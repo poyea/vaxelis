@@ -69,29 +69,29 @@ void main() {
 } // namespace
 
 bool SpriteBatch::init(rhi::IDevice& device, uint32_t max_quads) {
-    max_quads_ = max_quads;
-    verts_.reserve(static_cast<size_t>(max_quads_) * 4);
+    m_max_quads = max_quads;
+    m_verts.reserve(static_cast<size_t>(m_max_quads) * 4);
 
     auto sh = device.create_shader({kVertexSrc, kFragmentSrc});
     if (!sh) {
         VX_ERROR("SpriteBatch: shader create failed ({})", rhi::to_string(sh.error()));
         return false;
     }
-    shader_ = *sh;
+    m_shader = *sh;
 
     auto vb = device.create_buffer({rhi::BufferUsage::Vertex, rhi::BufferAccess::Dynamic,
-                                    sizeof(Vertex) * max_quads_ * 4, nullptr});
+                                    sizeof(Vertex) * m_max_quads * 4, nullptr});
     if (!vb) {
-        device.destroy(shader_);
+        device.destroy(m_shader);
         return false;
     }
-    vb_ = *vb;
+    m_vb = *vb;
 
     // Pre-build the index buffer: each quad is 6 indices (two triangles) in a
     // fixed pattern, so it can live in a static buffer for the lifetime of the
     // batcher.
-    std::vector<uint16_t> indices(static_cast<size_t>(max_quads_) * 6);
-    for (uint32_t q = 0; q < max_quads_; ++q) {
+    std::vector<uint16_t> indices(static_cast<size_t>(m_max_quads) * 6);
+    for (uint32_t q = 0; q < m_max_quads; ++q) {
         const uint16_t base = static_cast<uint16_t>(q * 4);
         const size_t i = static_cast<size_t>(q) * 6;
         indices[i + 0] = base + 0;
@@ -104,26 +104,26 @@ bool SpriteBatch::init(rhi::IDevice& device, uint32_t max_quads) {
     auto ib = device.create_buffer({rhi::BufferUsage::Index, rhi::BufferAccess::Static,
                                     indices.size() * sizeof(uint16_t), indices.data()});
     if (!ib) {
-        device.destroy(shader_);
-        device.destroy(vb_);
+        device.destroy(m_shader);
+        device.destroy(m_vb);
         return false;
     }
-    ib_ = *ib;
+    m_ib = *ib;
     return true;
 }
 
 void SpriteBatch::shutdown(rhi::IDevice& device) {
-    if (ib_.valid())
-        device.destroy(ib_);
-    if (vb_.valid())
-        device.destroy(vb_);
-    if (shader_.valid())
-        device.destroy(shader_);
-    ib_ = {};
-    vb_ = {};
-    shader_ = {};
-    verts_.clear();
-    device_ = nullptr;
+    if (m_ib.valid())
+        device.destroy(m_ib);
+    if (m_vb.valid())
+        device.destroy(m_vb);
+    if (m_shader.valid())
+        device.destroy(m_shader);
+    m_ib = {};
+    m_vb = {};
+    m_shader = {};
+    m_verts.clear();
+    m_device = nullptr;
 }
 
 void SpriteBatch::begin(rhi::IDevice& device, uint32_t screen_w, uint32_t screen_h) {
@@ -132,22 +132,22 @@ void SpriteBatch::begin(rhi::IDevice& device, uint32_t screen_w, uint32_t screen
 }
 
 void SpriteBatch::begin(rhi::IDevice& device, const mat4& projection) {
-    assert(!in_frame_ && "SpriteBatch::begin called twice without end");
-    device_ = &device;
-    proj_ = projection;
-    current_tex_ = {};
-    verts_.clear();
-    draw_calls_ = 0;
-    quads_ = 0;
-    in_frame_ = true;
+    assert(!m_in_frame && "SpriteBatch::begin called twice without end");
+    m_device = &device;
+    m_proj = projection;
+    m_current_tex = {};
+    m_verts.clear();
+    m_draw_calls = 0;
+    m_quads = 0;
+    m_in_frame = true;
 }
 
 void SpriteBatch::end() {
-    assert(in_frame_ && "SpriteBatch::end without begin");
+    assert(m_in_frame && "SpriteBatch::end without begin");
     flush();
-    last_draw_calls_ = draw_calls_;
-    last_quads_ = quads_;
-    in_frame_ = false;
+    m_last_draw_calls = m_draw_calls;
+    m_last_quads = m_quads;
+    m_in_frame = false;
 }
 
 void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 color) {
@@ -155,16 +155,16 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 color) 
 }
 
 void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect, vec4 color) {
-    assert(in_frame_ && "SpriteBatch::draw outside begin/end");
+    assert(m_in_frame && "SpriteBatch::draw outside begin/end");
     if (!tex.valid())
         return;
 
     // Flush on texture change or when the per-batch cap is hit.
-    if (current_tex_.id != tex.id || verts_.size() / 4 >= max_quads_) {
+    if (m_current_tex.id != tex.id || m_verts.size() / 4 >= m_max_quads) {
         flush();
-        current_tex_ = tex;
-    } else if (!current_tex_.valid()) {
-        current_tex_ = tex;
+        m_current_tex = tex;
+    } else if (!m_current_tex.valid()) {
+        m_current_tex = tex;
     }
 
     const float hw = size.x * 0.5f;
@@ -176,23 +176,23 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect
     // v0 is the top edge: textures upload row 0 first, so v = 0 is the image's
     // top row, and the screen-space ortho is y-down, so the smaller v belongs on
     // the smaller y. Pairing them the other way flips every sprite vertically.
-    verts_.push_back({x0, y0, u0, v0, color.r, color.g, color.b, color.a});
-    verts_.push_back({x1, y0, u1, v0, color.r, color.g, color.b, color.a});
-    verts_.push_back({x1, y1, u1, v1, color.r, color.g, color.b, color.a});
-    verts_.push_back({x0, y1, u0, v1, color.r, color.g, color.b, color.a});
-    ++quads_;
+    m_verts.push_back({x0, y0, u0, v0, color.r, color.g, color.b, color.a});
+    m_verts.push_back({x1, y0, u1, v0, color.r, color.g, color.b, color.a});
+    m_verts.push_back({x1, y1, u1, v1, color.r, color.g, color.b, color.a});
+    m_verts.push_back({x0, y1, u0, v1, color.r, color.g, color.b, color.a});
+    ++m_quads;
 }
 
 void SpriteBatch::flush() {
-    if (verts_.empty() || !current_tex_.valid())
+    if (m_verts.empty() || !m_current_tex.valid())
         return;
-    const auto byte_count = verts_.size() * sizeof(Vertex);
-    device_->update_buffer(vb_, std::span<const std::byte>(
-                                    reinterpret_cast<const std::byte*>(verts_.data()), byte_count));
-    const uint32_t index_count = static_cast<uint32_t>(verts_.size() / 4) * 6;
-    device_->draw_sprite_batch(shader_, vb_, ib_, index_count, current_tex_, proj_);
-    ++draw_calls_;
-    verts_.clear();
+    const auto byte_count = m_verts.size() * sizeof(Vertex);
+    const auto* bytes = reinterpret_cast<const std::byte*>(m_verts.data());
+    m_device->update_buffer(m_vb, std::span<const std::byte>(bytes, byte_count));
+    const uint32_t index_count = static_cast<uint32_t>(m_verts.size() / 4) * 6;
+    m_device->draw_sprite_batch(m_shader, m_vb, m_ib, index_count, m_current_tex, m_proj);
+    ++m_draw_calls;
+    m_verts.clear();
 }
 
 } // namespace vaxelis

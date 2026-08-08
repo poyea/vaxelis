@@ -11,7 +11,7 @@
 
 namespace vaxelis {
 
-Application::Application(AppConfig cfg) noexcept : cfg_(std::move(cfg)) {
+Application::Application(AppConfig cfg) noexcept : m_cfg(std::move(cfg)) {
 }
 
 Application::~Application() {
@@ -38,88 +38,88 @@ bool Application::init() {
 #endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    window_ = SDL_CreateWindow(
-        cfg_.title.c_str(), static_cast<int>(cfg_.width), static_cast<int>(cfg_.height),
+    m_window = SDL_CreateWindow(
+        m_cfg.title.c_str(), static_cast<int>(m_cfg.width), static_cast<int>(m_cfg.height),
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-    if (!window_) {
+    if (!m_window) {
         VX_ERROR("SDL_CreateWindow failed: {}", SDL_GetError());
         return false;
     }
 
-    gl_ctx_ = SDL_GL_CreateContext(window_);
-    if (!gl_ctx_) {
+    m_gl_ctx = SDL_GL_CreateContext(m_window);
+    if (!m_gl_ctx) {
         VX_ERROR("SDL_GL_CreateContext failed: {}", SDL_GetError());
         return false;
     }
-    SDL_GL_MakeCurrent(window_, static_cast<SDL_GLContext>(gl_ctx_));
+    SDL_GL_MakeCurrent(m_window, static_cast<SDL_GLContext>(m_gl_ctx));
     SDL_GL_SetSwapInterval(1);
 
-    auto dev = rhi::create_device(cfg_.backend);
+    auto dev = rhi::create_device(m_cfg.backend);
     if (!dev) {
         VX_ERROR("RHI device creation failed: {}", rhi::to_string(dev.error()));
         return false;
     }
-    device_ = std::move(*dev);
+    m_device = std::move(*dev);
 
-    imgui_.init(window_, gl_ctx_);
-    imgui_inited_ = true;
+    m_imgui.init(m_window, m_gl_ctx);
+    m_imgui_inited = true;
 
-    if (!audio_.init()) {
+    if (!m_audio.init()) {
         VX_WARN("Audio init failed; continuing without sound");
     } else {
-        audio_inited_ = true;
+        m_audio_inited = true;
     }
 
     refresh_drawable_size();
-    inited_ = true;
+    m_inited = true;
     return true;
 }
 
 void Application::shutdown_subsystems() noexcept {
-    if (audio_inited_) {
-        audio_.shutdown();
-        audio_inited_ = false;
+    if (m_audio_inited) {
+        m_audio.shutdown();
+        m_audio_inited = false;
     }
-    if (imgui_inited_) {
-        imgui_.shutdown();
-        imgui_inited_ = false;
+    if (m_imgui_inited) {
+        m_imgui.shutdown();
+        m_imgui_inited = false;
     }
-    device_.reset();
-    if (gl_ctx_) {
-        SDL_GL_DestroyContext(static_cast<SDL_GLContext>(gl_ctx_));
-        gl_ctx_ = nullptr;
+    m_device.reset();
+    if (m_gl_ctx) {
+        SDL_GL_DestroyContext(static_cast<SDL_GLContext>(m_gl_ctx));
+        m_gl_ctx = nullptr;
     }
-    if (window_) {
-        SDL_DestroyWindow(window_);
-        window_ = nullptr;
+    if (m_window) {
+        SDL_DestroyWindow(m_window);
+        m_window = nullptr;
     }
     SDL_Quit();
 }
 
 void Application::refresh_drawable_size() {
     int w = 0, h = 0;
-    SDL_GetWindowSizeInPixels(window_, &w, &h);
-    fb_width_ = static_cast<uint32_t>(w);
-    fb_height_ = static_cast<uint32_t>(h);
+    SDL_GetWindowSizeInPixels(m_window, &w, &h);
+    m_fb_width = static_cast<uint32_t>(w);
+    m_fb_height = static_cast<uint32_t>(h);
 }
 
 void Application::step_frame() {
-    input_.begin_frame();
+    m_input.begin_frame();
 
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
-        imgui_.process_event(ev);
-        input_.on_event(ev);
+        m_imgui.process_event(ev);
+        m_input.on_event(ev);
         if (ev.type == SDL_EVENT_QUIT)
-            running_ = false;
+            m_running = false;
         if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE)
-            running_ = false;
+            m_running = false;
         if (ev.type == SDL_EVENT_WINDOW_RESIZED || ev.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
             refresh_drawable_size();
         }
     }
 
-    float frame_dt = clock_.tick();
+    float frame_dt = m_clock.tick();
     // Clamp absurd deltas (paused under debugger) to avoid huge accumulator.
     if (frame_dt > 0.25f)
         frame_dt = 0.25f;
@@ -127,36 +127,36 @@ void Application::step_frame() {
     // Fixed-timestep with accumulator. Caps catch-up steps so a long pause
     // (debugger break, alt-tab) doesn't trigger the spiral of death.
     constexpr int kMaxStepsPerFrame = 8;
-    accumulator_ += frame_dt;
+    m_accumulator += frame_dt;
     int steps = 0;
-    while (accumulator_ >= kFixedDt && steps < kMaxStepsPerFrame) {
+    while (m_accumulator >= kFixedDt && steps < kMaxStepsPerFrame) {
         on_fixed_update(kFixedDt);
-        accumulator_ -= kFixedDt;
+        m_accumulator -= kFixedDt;
         ++steps;
     }
     if (steps == kMaxStepsPerFrame)
-        accumulator_ = 0.0; // drop residual on overrun
+        m_accumulator = 0.0; // drop residual on overrun
     on_update(frame_dt);
 
-    device_->begin_frame(clear_color_, fb_width_, fb_height_);
+    m_device->begin_frame(m_clear_color, m_fb_width, m_fb_height);
     on_render();
 
-    imgui_.begin_frame();
+    m_imgui.begin_frame();
     on_imgui();
-    imgui_.end_frame();
+    m_imgui.end_frame();
 
-    device_->end_frame();
-    SDL_GL_SwapWindow(window_);
+    m_device->end_frame();
+    SDL_GL_SwapWindow(m_window);
 }
 
 int Application::run() {
-    if (!inited_) {
+    if (!m_inited) {
         VX_ERROR("Application::run() called before init()");
         return 1;
     }
 
     on_init();
-    clock_.tick(); // discard the construction-to-first-frame delta
+    m_clock.tick(); // discard the construction-to-first-frame delta
 
 #ifdef __EMSCRIPTEN__
     // The browser drives the loop via requestAnimationFrame; a blocking while
@@ -166,7 +166,7 @@ int Application::run() {
                                  this, 0, /*simulate_infinite_loop=*/true);
     return 0; // not reached
 #else
-    while (running_) {
+    while (m_running) {
         step_frame();
     }
     on_shutdown();

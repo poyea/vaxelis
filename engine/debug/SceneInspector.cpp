@@ -22,22 +22,22 @@ void SceneInspector::draw(Scene& scene) {
     ImGui::EndChild();
     ImGui::End();
 
-    if (pending_destroy_ != entt::null) {
-        if (selected_ == pending_destroy_)
-            selected_ = entt::null;
-        scene.destroy_node(pending_destroy_);
-        pending_destroy_ = entt::null;
+    if (m_pending_destroy != entt::null) {
+        if (m_selected == m_pending_destroy)
+            m_selected = entt::null;
+        scene.destroy_node(m_pending_destroy);
+        m_pending_destroy = entt::null;
     }
 }
 
 void SceneInspector::draw_hierarchy(Scene& scene) {
     if (ImGui::Button("+ Node")) {
-        auto parent = (selected_ != entt::null) ? selected_ : scene.root();
-        selected_ = scene.create_node("Node", parent);
+        auto parent = (m_selected != entt::null) ? m_selected : scene.root();
+        m_selected = scene.create_node("Node", parent);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Delete") && selected_ != entt::null && selected_ != scene.root()) {
-        pending_destroy_ = selected_;
+    if (ImGui::Button("Delete") && m_selected != entt::null && m_selected != scene.root()) {
+        m_pending_destroy = m_selected;
     }
     ImGui::Separator();
     draw_node_recursive(scene, scene.root());
@@ -53,7 +53,7 @@ void SceneInspector::draw_node_recursive(Scene& scene, entt::entity e) {
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (h.children.empty())
         flags |= ImGuiTreeNodeFlags_Leaf;
-    if (e == selected_)
+    if (e == m_selected)
         flags |= ImGuiTreeNodeFlags_Selected;
     if (e == scene.root())
         flags |= ImGuiTreeNodeFlags_DefaultOpen;
@@ -61,7 +61,7 @@ void SceneInspector::draw_node_recursive(Scene& scene, entt::entity e) {
     const bool open = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(e)), flags,
                                         "%s", name.c_str());
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
-        selected_ = e;
+        m_selected = e;
     if (open) {
         for (auto c : h.children)
             draw_node_recursive(scene, c);
@@ -70,12 +70,12 @@ void SceneInspector::draw_node_recursive(Scene& scene, entt::entity e) {
 }
 
 void SceneInspector::draw_properties(Scene& scene) {
-    if (selected_ == entt::null || !scene.registry().valid(selected_)) {
+    if (m_selected == entt::null || !scene.registry().valid(m_selected)) {
         ImGui::TextDisabled("No selection.");
         return;
     }
     auto& reg = scene.registry();
-    auto e = selected_;
+    auto e = m_selected;
 
     auto& name = reg.get<Name>(e);
     char buf[128];

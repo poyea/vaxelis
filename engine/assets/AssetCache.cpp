@@ -43,43 +43,43 @@ LoadedImage load_rgba8(const std::string& path) {
 } // namespace
 
 bool AssetCache::init(rhi::IDevice& device, FileWatcher* watcher) {
-    device_ = &device;
+    m_device = &device;
     AssetRegistry<TextureAsset>::Ops ops;
     ops.load = [this](const std::string& path) { return create(path); };
     ops.reload = [this](const std::string& path, TextureAsset& tex) { return refresh(path, tex); };
-    ops.destroy = [this](TextureAsset tex) { device_->destroy(tex.handle); };
-    textures_.init(std::move(ops), watcher);
+    ops.destroy = [this](TextureAsset tex) { m_device->destroy(tex.handle); };
+    m_textures.init(std::move(ops), watcher);
     return true;
 }
 
 void AssetCache::shutdown() {
-    textures_.shutdown();
-    device_ = nullptr;
+    m_textures.shutdown();
+    m_device = nullptr;
 }
 
 rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_view key) {
-    return textures_.load(path, key).handle;
+    return m_textures.load(path, key).handle;
 }
 
 rhi::TextureHandle AssetCache::get_texture(std::string_view key) const {
-    return textures_.get(key).handle;
+    return m_textures.get(key).handle;
 }
 
 rhi::TextureHandle AssetCache::adopt_texture(std::string_view key, rhi::TextureHandle handle) {
-    return textures_.adopt(key, TextureAsset{.handle = handle}).handle;
+    return m_textures.adopt(key, TextureAsset{.handle = handle}).handle;
 }
 
 void AssetCache::reload_texture(std::string_view key) {
-    textures_.reload(key);
+    m_textures.reload(key);
 }
 
 void AssetCache::add_listener(ReloadListener l) {
-    textures_.add_listener(
+    m_textures.add_listener(
         [cb = std::move(l)](std::string_view key, TextureAsset tex) { cb(key, tex.handle); });
 }
 
 TextureAsset AssetCache::create(const std::string& path) {
-    if (!device_)
+    if (!m_device)
         return {};
     auto img = load_rgba8(path);
     if (img.px.empty())
@@ -93,14 +93,14 @@ TextureAsset AssetCache::create(const std::string& path) {
         .format = rhi::TextureFormat::RGBA8,
         .initial_data = img.px.data(),
     };
-    auto tex = device_->create_texture(td);
+    auto tex = m_device->create_texture(td);
     if (!tex)
         return {};
     return TextureAsset{.handle = *tex, .width = w, .height = h};
 }
 
 bool AssetCache::refresh(const std::string& path, TextureAsset& tex) {
-    if (!device_)
+    if (!m_device)
         return false;
     auto img = load_rgba8(path);
     if (img.px.empty())
@@ -113,13 +113,13 @@ bool AssetCache::refresh(const std::string& path, TextureAsset& tex) {
     // stay stable. Dependents (e.g. SpriteComponent ids) need no rebinding and
     // listeners are not disturbed.
     if (tex.handle.valid() && w == tex.width && h == tex.height) {
-        device_->update_texture(tex.handle, rhi::TextureUpdate{
-                                                .x = 0,
-                                                .y = 0,
-                                                .width = w,
-                                                .height = h,
-                                                .data = img.px.data(),
-                                            });
+        m_device->update_texture(tex.handle, rhi::TextureUpdate{
+                                                 .x = 0,
+                                                 .y = 0,
+                                                 .width = w,
+                                                 .height = h,
+                                                 .data = img.px.data(),
+                                             });
         VX_INFO("AssetCache: reloaded texture '{}' in place", path);
         return false;
     }
@@ -128,14 +128,14 @@ bool AssetCache::refresh(const std::string& path, TextureAsset& tex) {
     // change is what makes the registry fan out to listeners, so clients rebind
     // the new handle -- including when creation failed and it is now null.
     if (tex.handle.valid())
-        device_->destroy(tex.handle);
+        m_device->destroy(tex.handle);
     rhi::TextureDesc td{
         .width = w,
         .height = h,
         .format = rhi::TextureFormat::RGBA8,
         .initial_data = img.px.data(),
     };
-    auto fresh = device_->create_texture(td);
+    auto fresh = m_device->create_texture(td);
     tex = fresh ? TextureAsset{.handle = *fresh, .width = w, .height = h} : TextureAsset{};
     VX_INFO("AssetCache: reloaded texture '{}'", path);
     return true;

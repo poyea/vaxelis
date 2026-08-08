@@ -59,40 +59,40 @@ template <class T> class AssetRegistry {
     /// Installs the callbacks. Without a `watcher` the registry only reloads
     /// when asked to.
     void init(Ops ops, FileWatcher* watcher = nullptr) {
-        ops_ = std::move(ops);
-        watcher_ = watcher;
+        m_ops = std::move(ops);
+        m_watcher = watcher;
     }
 
     /// Destroys every owned asset and clears the callbacks. Assets outlive the
     /// registry if this is never called, so call it while the owning subsystem
     /// (device, audio engine) is still alive.
     void shutdown() {
-        if (ops_.destroy) {
-            for (auto& [_, e] : entries_) {
+        if (m_ops.destroy) {
+            for (auto& [_, e] : m_entries) {
                 if (e.value.valid())
-                    ops_.destroy(e.value);
+                    m_ops.destroy(e.value);
             }
         }
-        entries_.clear();
-        listeners_.clear();
-        ops_ = {};
-        watcher_ = nullptr;
+        m_entries.clear();
+        m_listeners.clear();
+        m_ops = {};
+        m_watcher = nullptr;
     }
 
     /// Loads `path` once; later calls with the same key return the cached asset.
     /// `key` defaults to `path`.
     T load(std::string_view path, std::string_view key = {}) {
         const std::string_view k = key.empty() ? path : key;
-        if (auto it = entries_.find(k); it != entries_.end())
+        if (auto it = m_entries.find(k); it != m_entries.end())
             return it->second.value;
-        if (!ops_.load)
+        if (!m_ops.load)
             return T{};
 
         const std::string p(path);
-        const T value = ops_.load(p);
+        const T value = m_ops.load(p);
         if (!value.valid())
             return T{};
-        entries_.emplace(std::string(k), Entry{p, value});
+        m_entries.emplace(std::string(k), Entry{p, value});
         watch(std::string(k), p);
         return value;
     }
@@ -101,44 +101,44 @@ template <class T> class AssetRegistry {
     /// and destroys it at shutdown like any other; whatever `key` held before is
     /// destroyed now. Adopted assets have no path, so they never hot-reload.
     T adopt(std::string_view key, T value) {
-        auto it = entries_.find(key);
-        if (it == entries_.end()) {
-            entries_.emplace(std::string(key), Entry{std::string{}, value});
+        auto it = m_entries.find(key);
+        if (it == m_entries.end()) {
+            m_entries.emplace(std::string(key), Entry{std::string{}, value});
             return value;
         }
-        if (ops_.destroy && it->second.value.valid())
-            ops_.destroy(it->second.value);
+        if (m_ops.destroy && it->second.value.valid())
+            m_ops.destroy(it->second.value);
         it->second = Entry{std::string{}, value};
         return value;
     }
 
     /// Asset bound to `key`, or an invalid value when unknown. Never loads.
     T get(std::string_view key) const {
-        auto it = entries_.find(key);
-        return it != entries_.end() ? it->second.value : T{};
+        auto it = m_entries.find(key);
+        return it != m_entries.end() ? it->second.value : T{};
     }
 
     /// True when `key` is bound.
-    bool contains(std::string_view key) const { return entries_.find(key) != entries_.end(); }
+    bool contains(std::string_view key) const { return m_entries.find(key) != m_entries.end(); }
 
     /// Number of bound keys.
-    size_t size() const { return entries_.size(); }
+    size_t size() const { return m_entries.size(); }
 
     /// Re-runs the reload hook for `key`; the watcher calls this for you. No-op
     /// for keys that are unknown or have no file. Listeners fire only when the
     /// hook reports that the value changed.
     void reload(std::string_view key) {
-        auto it = entries_.find(key);
-        if (it == entries_.end() || it->second.path.empty() || !ops_.reload)
+        auto it = m_entries.find(key);
+        if (it == m_entries.end() || it->second.path.empty() || !m_ops.reload)
             return;
-        if (!ops_.reload(it->second.path, it->second.value))
+        if (!m_ops.reload(it->second.path, it->second.value))
             return;
-        for (auto& l : listeners_)
+        for (auto& l : m_listeners)
             l(it->first, it->second.value);
     }
 
     /// Registers a reload listener; see ReloadListener.
-    void add_listener(ReloadListener l) { listeners_.push_back(std::move(l)); }
+    void add_listener(ReloadListener l) { m_listeners.push_back(std::move(l)); }
 
   private:
     struct Entry {
@@ -147,15 +147,15 @@ template <class T> class AssetRegistry {
     };
 
     void watch(std::string key, const std::string& path) {
-        if (!watcher_ || path.empty())
+        if (!m_watcher || path.empty())
             return;
-        watcher_->watch(path, [this, k = std::move(key)](const std::string&) { reload(k); });
+        m_watcher->watch(path, [this, k = std::move(key)](const std::string&) { reload(k); });
     }
 
-    StringMap<Entry> entries_;
-    std::vector<ReloadListener> listeners_;
-    Ops ops_;
-    FileWatcher* watcher_{nullptr};
+    StringMap<Entry> m_entries;
+    std::vector<ReloadListener> m_listeners;
+    Ops m_ops;
+    FileWatcher* m_watcher{nullptr};
 };
 
 } // namespace vaxelis

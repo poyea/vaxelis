@@ -59,8 +59,8 @@ class AssetCache {
     TextureAsset create(const std::string& path);
     bool refresh(const std::string& path, TextureAsset& tex);
 
-    rhi::IDevice* device_{nullptr};
-    AssetRegistry<TextureAsset> textures_;
+    rhi::IDevice* m_device{nullptr};
+    AssetRegistry<TextureAsset> m_textures;
 };
 
 } // namespace vaxelis

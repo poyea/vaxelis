@@ -95,13 +95,13 @@ class Platformer final : public vaxelis::Application {
 
   protected:
     void on_init() override {
-        assets_.init(device(), &watcher_);
+        m_assets.init(device(), &m_watcher);
         register_procedural("atlas", 64, 64, make_atlas());
         register_procedural("white", 8, 8, make_solid(8, 8, 255, 255, 255));
         register_procedural("enemy", 8, 8, make_solid(8, 8, 230, 70, 90));
         register_procedural("goal", 8, 8, make_solid(8, 8, 250, 230, 80));
 
-        if (!batch_.init(device())) {
+        if (!m_batch.init(device())) {
             VX_ERROR("SpriteBatch init failed");
             return;
         }
@@ -126,9 +126,9 @@ class Platformer final : public vaxelis::Application {
             return true;
         };
         ops.destroy = [this](vaxelis::SoundHandle h) { audio().unload(h); };
-        cues_.init(std::move(ops), &watcher_);
+        m_cues.init(std::move(ops), &m_watcher);
         for (const char* name : {"jump", "squash", "level-complete", "death", "win-game"}) {
-            cues_.load("assets/audio/" + std::string(name) + ".wav", name);
+            m_cues.load("assets/audio/" + std::string(name) + ".wav", name);
         }
 
         load_level(1);
@@ -136,81 +136,81 @@ class Platformer final : public vaxelis::Application {
     }
 
     void on_update(float dt) override {
-        watcher_.tick(dt);
-        if (player_ != entt::null) {
-            const auto& t = scene_.registry().get<vaxelis::Transform2D>(player_);
+        m_watcher.tick(dt);
+        if (m_player != entt::null) {
+            const auto& t = m_scene.registry().get<vaxelis::Transform2D>(m_player);
             const float follow = 1.0f - std::exp(-8.0f * dt);
-            camera_.position += (t.position - camera_.position) * follow;
+            m_camera.position += (t.position - m_camera.position) * follow;
         }
         // Levels are single-screen; zoom so the level fills the framebuffer,
         // which tracks the window (and on web, the browser viewport).
-        const vaxelis::vec2 world = map_.world_size();
+        const vaxelis::vec2 world = m_map.world_size();
         if (world.x > 0.0f && world.y > 0.0f) {
-            camera_.zoom = std::min(static_cast<float>(width()) / world.x,
-                                    static_cast<float>(height()) / world.y);
+            m_camera.zoom = std::min(static_cast<float>(width()) / world.x,
+                                     static_cast<float>(height()) / world.y);
         }
-        camera_.apply_bounds(width(), height());
+        m_camera.apply_bounds(width(), height());
     }
 
     void on_fixed_update(float dt) override {
         // Global controls that work in any state.
         if (input().pressed("restart")) {
-            load_level(current_level_);
+            load_level(m_current_level);
             return;
         }
-        if (state_ == GameState::LevelComplete && input().pressed("advance")) {
-            load_level(current_level_ + 1);
+        if (m_state == GameState::LevelComplete && input().pressed("advance")) {
+            load_level(m_current_level + 1);
             return;
         }
-        if (state_ == GameState::Won && input().pressed("advance")) {
-            current_level_ = 1;
+        if (m_state == GameState::Won && input().pressed("advance")) {
+            m_current_level = 1;
             load_level(1);
             return;
         }
-        if (state_ != GameState::Playing) {
-            physics_.step(dt); // keep world ticking so visuals don't freeze weirdly
-            physics_.sync_to_scene(scene_);
+        if (m_state != GameState::Playing) {
+            m_physics.step(dt); // keep world ticking so visuals don't freeze weirdly
+            m_physics.sync_to_scene(m_scene);
             return;
         }
 
         drive_player(dt);
         update_enemies(dt);
-        physics_.sync_to_scene(scene_);
-        physics_.step(dt);
-        physics_.sync_to_scene(scene_);
+        m_physics.sync_to_scene(m_scene);
+        m_physics.step(dt);
+        m_physics.sync_to_scene(m_scene);
         check_triggers();
     }
 
     void on_render() override {
-        batch_.begin(device(), camera_.projection(width(), height()));
-        vaxelis::tiled::render(map_, batch_, camera_.visible_bounds(width(), height()));
-        scene_.render_sprites(batch_);
-        batch_.end();
+        m_batch.begin(device(), m_camera.projection(width(), height()));
+        vaxelis::tiled::render(m_map, m_batch, m_camera.visible_bounds(width(), height()));
+        m_scene.render_sprites(m_batch);
+        m_batch.end();
     }
 
     void on_imgui() override {
         ImGui::Begin("HUD");
-        ImGui::Text("Level %d / %d", current_level_, kNumLevels);
+        ImGui::Text("Level %d / %d", m_current_level, kNumLevels);
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
         ImGui::Text("Move: A/D or arrows  -  Jump: Space  -  Restart: R");
         ImGui::End();
 
         // Centered overlay for transient states. Modal with manual positioning
         // so we don't depend on docking.
-        if (state_ != GameState::Playing) {
+        if (m_state != GameState::Playing) {
             const ImVec2 vp = ImGui::GetMainViewport()->Size;
             ImGui::SetNextWindowPos({vp.x * 0.5f, vp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
             ImGui::SetNextWindowBgAlpha(0.85f);
             ImGui::Begin("##overlay", nullptr,
                          ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
-            switch (state_) {
+            switch (m_state) {
             case GameState::Dead:
                 ImGui::Text("You died.");
                 ImGui::Text("Press R to restart.");
                 break;
             case GameState::LevelComplete:
-                ImGui::Text("Level %d complete!", current_level_);
+                ImGui::Text("Level %d complete!", m_current_level);
                 ImGui::Text("Press Enter to continue.");
                 break;
             case GameState::Won:
@@ -226,10 +226,10 @@ class Platformer final : public vaxelis::Application {
 
     void on_shutdown() override {
         tear_down_level();
-        physics_.shutdown();
-        batch_.shutdown(device());
-        cues_.shutdown();
-        assets_.shutdown();
+        m_physics.shutdown();
+        m_batch.shutdown(device());
+        m_cues.shutdown();
+        m_assets.shutdown();
     }
 
   private:
@@ -243,38 +243,38 @@ class Platformer final : public vaxelis::Application {
                                            .format = vaxelis::rhi::TextureFormat::RGBA8,
                                            .initial_data = px.data()})
                           .value_or(vaxelis::rhi::TextureHandle{});
-        assets_.adopt_texture(key, handle);
+        m_assets.adopt_texture(key, handle);
     }
 
     vaxelis::rhi::TextureHandle texture_for(const std::string& key) const {
-        return assets_.get_texture(key);
+        return m_assets.get_texture(key);
     }
 
     void tear_down_level() {
-        physics_.shutdown();
-        scene_ = vaxelis::Scene{};
-        map_ = vaxelis::TiledMap{};
-        hazards_.clear();
-        goal_ = {};
-        enemies_.clear();
-        player_ = entt::null;
+        m_physics.shutdown();
+        m_scene = vaxelis::Scene{};
+        m_map = vaxelis::TiledMap{};
+        m_hazards.clear();
+        m_goal = {};
+        m_enemies.clear();
+        m_player = entt::null;
     }
 
     void load_level(int n) {
         if (n > kNumLevels) {
-            state_ = GameState::Won;
+            m_state = GameState::Won;
             play_cue("win-game");
             return;
         }
         tear_down_level();
-        current_level_ = n;
-        state_ = GameState::Playing;
+        m_current_level = n;
+        m_state = GameState::Playing;
 
-        physics_.init({.gravity = {0.0f, 1400.0f}, .pixels_per_meter = 100.0f, .sub_steps = 4});
-        physics_.register_with(scene_);
+        m_physics.init({.gravity = {0.0f, 1400.0f}, .pixels_per_meter = 100.0f, .sub_steps = 4});
+        m_physics.register_with(m_scene);
 
-        if (!vaxelis::tiled::load_file(
-                map_, level_path(n), [this](const std::string& img) { return texture_for(img); })) {
+        const auto resolve = [this](const std::string& img) { return texture_for(img); };
+        if (!vaxelis::tiled::load_file(m_map, level_path(n), resolve)) {
             VX_ERROR("Could not load {}", level_path(n));
             return;
         }
@@ -283,17 +283,17 @@ class Platformer final : public vaxelis::Application {
         build_entities_from_objects();
         resolve_textures();
 
-        camera_.bounds_min = {0.0f, 0.0f};
-        camera_.bounds_max = map_.world_size();
-        camera_.zoom = 1.0f;
-        if (player_ != entt::null) {
-            camera_.position = scene_.registry().get<vaxelis::Transform2D>(player_).position;
+        m_camera.bounds_min = {0.0f, 0.0f};
+        m_camera.bounds_max = m_map.world_size();
+        m_camera.zoom = 1.0f;
+        if (m_player != entt::null) {
+            m_camera.position = m_scene.registry().get<vaxelis::Transform2D>(m_player).position;
         }
         VX_INFO("Loaded level {}", n);
     }
 
     void build_static_colliders() {
-        for (const auto& layer : map_.tile_layers) {
+        for (const auto& layer : m_map.tile_layers) {
             if (layer.name != "world")
                 continue;
             for (int y = 0; y < layer.height; ++y) {
@@ -301,33 +301,33 @@ class Platformer final : public vaxelis::Application {
                     const uint32_t gid = layer.gids[static_cast<size_t>(y) * layer.width + x];
                     if (gid == 0)
                         continue;
-                    auto e = scene_.create_node("Tile");
-                    auto& tr = scene_.registry().get<vaxelis::Transform2D>(e);
-                    tr.position = {(x + 0.5f) * map_.tile_w, (y + 0.5f) * map_.tile_h};
-                    scene_.registry().emplace<vaxelis::RigidBody2D>(e).type =
+                    auto e = m_scene.create_node("Tile");
+                    auto& tr = m_scene.registry().get<vaxelis::Transform2D>(e);
+                    tr.position = {(x + 0.5f) * m_map.tile_w, (y + 0.5f) * m_map.tile_h};
+                    m_scene.registry().emplace<vaxelis::RigidBody2D>(e).type =
                         vaxelis::BodyType::Static;
-                    scene_.registry().emplace<vaxelis::BoxCollider2D>(e).half_extents = {
-                        map_.tile_w * 0.5f, map_.tile_h * 0.5f};
+                    m_scene.registry().emplace<vaxelis::BoxCollider2D>(e).half_extents = {
+                        m_map.tile_w * 0.5f, m_map.tile_h * 0.5f};
                 }
             }
         }
     }
 
     void build_entities_from_objects() {
-        for (const auto& g : map_.object_groups) {
+        for (const auto& g : m_map.object_groups) {
             for (const auto& obj : g.objects) {
                 if (obj.type == "spawn" || obj.name == "player") {
                     spawn_player(obj.pos);
                 } else if (obj.type == "enemy") {
                     spawn_enemy(obj.pos);
                 } else if (obj.type == "hazard") {
-                    hazards_.push_back({obj.pos, obj.pos + obj.size});
+                    m_hazards.push_back({obj.pos, obj.pos + obj.size});
                 } else if (obj.type == "goal") {
-                    goal_ = {obj.pos, obj.pos + obj.size};
-                    auto e = scene_.create_node("Goal");
-                    scene_.registry().get<vaxelis::Transform2D>(e).position =
+                    m_goal = {obj.pos, obj.pos + obj.size};
+                    auto e = m_scene.create_node("Goal");
+                    m_scene.registry().get<vaxelis::Transform2D>(e).position =
                         (obj.pos + obj.size) * 0.5f;
-                    auto& s = scene_.registry().emplace<vaxelis::SpriteComponent>(e);
+                    auto& s = m_scene.registry().emplace<vaxelis::SpriteComponent>(e);
                     s.texture_key = "goal";
                     s.size = obj.size;
                     s.color = {1.0f, 1.0f, 0.4f, 1.0f};
@@ -338,35 +338,35 @@ class Platformer final : public vaxelis::Application {
     }
 
     void spawn_player(vaxelis::vec2 pos) {
-        player_ = scene_.create_node("Player");
-        scene_.registry().get<vaxelis::Transform2D>(player_).position = pos;
-        auto& s = scene_.registry().emplace<vaxelis::SpriteComponent>(player_);
+        m_player = m_scene.create_node("Player");
+        m_scene.registry().get<vaxelis::Transform2D>(m_player).position = pos;
+        auto& s = m_scene.registry().emplace<vaxelis::SpriteComponent>(m_player);
         s.texture_key = "white";
         s.size = {28.0f, 44.0f};
         s.color = {0.95f, 0.3f, 0.25f, 1.0f};
         s.z_order = 10;
-        auto& rb = scene_.registry().emplace<vaxelis::RigidBody2D>(player_);
+        auto& rb = m_scene.registry().emplace<vaxelis::RigidBody2D>(m_player);
         rb.fixed_rotation = true;
         rb.linear_damping = 0.5f;
-        scene_.registry().emplace<vaxelis::BoxCollider2D>(player_).half_extents = {14.0f, 22.0f};
+        m_scene.registry().emplace<vaxelis::BoxCollider2D>(m_player).half_extents = {14.0f, 22.0f};
     }
 
     void spawn_enemy(vaxelis::vec2 pos) {
-        auto e = scene_.create_node("Enemy");
-        scene_.registry().get<vaxelis::Transform2D>(e).position = pos;
-        auto& s = scene_.registry().emplace<vaxelis::SpriteComponent>(e);
+        auto e = m_scene.create_node("Enemy");
+        m_scene.registry().get<vaxelis::Transform2D>(e).position = pos;
+        auto& s = m_scene.registry().emplace<vaxelis::SpriteComponent>(e);
         s.texture_key = "enemy";
         s.size = {28.0f, 28.0f};
         s.color = {1.0f, 1.0f, 1.0f, 1.0f};
         s.z_order = 8;
         Enemy en;
         en.origin_x = pos.x;
-        scene_.registry().emplace<Enemy>(e, en);
-        enemies_.push_back(e);
+        m_scene.registry().emplace<Enemy>(e, en);
+        m_enemies.push_back(e);
     }
 
     void resolve_textures() {
-        auto view = scene_.registry().view<vaxelis::SpriteComponent>();
+        auto view = m_scene.registry().view<vaxelis::SpriteComponent>();
         for (auto e : view) {
             auto& s = view.get<vaxelis::SpriteComponent>(e);
             s.texture = texture_for(s.texture_key);
@@ -374,12 +374,12 @@ class Platformer final : public vaxelis::Application {
     }
 
     void drive_player(float dt) {
-        if (player_ == entt::null)
+        if (m_player == entt::null)
             return;
-        const auto& rb = scene_.registry().get<vaxelis::RigidBody2D>(player_);
+        const auto& rb = m_scene.registry().get<vaxelis::RigidBody2D>(m_player);
         if (B2_IS_NULL(rb.body))
             return;
-        const float ppm = physics_.pixels_per_meter();
+        const float ppm = m_physics.pixels_per_meter();
 
         // Set horizontal velocity directly; preserve vertical (gravity-driven).
         const b2Vec2 v = b2Body_GetLinearVelocity(rb.body);
@@ -399,8 +399,8 @@ class Platformer final : public vaxelis::Application {
     }
 
     void update_enemies(float dt) {
-        auto& reg = scene_.registry();
-        for (auto e : enemies_) {
+        auto& reg = m_scene.registry();
+        for (auto e : m_enemies) {
             if (!reg.valid(e))
                 continue;
             auto& en = reg.get<Enemy>(e);
@@ -420,19 +420,19 @@ class Platformer final : public vaxelis::Application {
     }
 
     AABB sprite_aabb(entt::entity e) const {
-        const auto& t = scene_.registry().get<vaxelis::Transform2D>(e);
-        const auto& s = scene_.registry().get<vaxelis::SpriteComponent>(e);
+        const auto& t = m_scene.registry().get<vaxelis::Transform2D>(e);
+        const auto& s = m_scene.registry().get<vaxelis::SpriteComponent>(e);
         const auto hx = s.size.x * 0.5f, hy = s.size.y * 0.5f;
         return {t.position - vaxelis::vec2{hx, hy}, t.position + vaxelis::vec2{hx, hy}};
     }
 
     void check_triggers() {
-        if (player_ == entt::null)
+        if (m_player == entt::null)
             return;
-        const auto pl = sprite_aabb(player_);
+        const auto pl = sprite_aabb(m_player);
 
         // Hazards: any overlap kills.
-        for (const auto& h : hazards_) {
+        for (const auto& h : m_hazards) {
             if (aabb_overlap(pl.min, pl.max, h.min, h.max)) {
                 kill_player();
                 return;
@@ -440,11 +440,11 @@ class Platformer final : public vaxelis::Application {
         }
 
         // Enemies: from-above contact squashes; otherwise dies.
-        auto& reg = scene_.registry();
-        const auto& player_rb = reg.get<vaxelis::RigidBody2D>(player_);
+        auto& reg = m_scene.registry();
+        const auto& player_rb = reg.get<vaxelis::RigidBody2D>(m_player);
         const b2Vec2 pv =
             B2_IS_NULL(player_rb.body) ? b2Vec2{0, 0} : b2Body_GetLinearVelocity(player_rb.body);
-        for (auto e : enemies_) {
+        for (auto e : m_enemies) {
             if (!reg.valid(e))
                 continue;
             auto& en = reg.get<Enemy>(e);
@@ -471,14 +471,14 @@ class Platformer final : public vaxelis::Application {
         }
 
         // Goal: any overlap completes the level.
-        if (aabb_overlap(pl.min, pl.max, goal_.min, goal_.max)) {
-            state_ = GameState::LevelComplete;
+        if (aabb_overlap(pl.min, pl.max, m_goal.min, m_goal.max)) {
+            m_state = GameState::LevelComplete;
             play_cue("level-complete");
         }
     }
 
     void kill_player() {
-        state_ = GameState::Dead;
+        m_state = GameState::Dead;
         play_cue("death");
     }
 
@@ -487,26 +487,26 @@ class Platformer final : public vaxelis::Application {
     // silent no-op.
     void play_cue(const char* name) {
         VX_INFO("[cue] {}", name);
-        audio().play(cues_.get(name));
+        audio().play(m_cues.get(name));
     }
 
-    vaxelis::SpriteBatch batch_;
-    vaxelis::Scene scene_;
-    vaxelis::SceneInspector inspector_; // available but not drawn during gameplay
-    vaxelis::Physics2D physics_;
-    vaxelis::FileWatcher watcher_;
-    vaxelis::AssetCache assets_;
-    vaxelis::TiledMap map_;
-    vaxelis::Camera2D camera_;
+    vaxelis::SpriteBatch m_batch;
+    vaxelis::Scene m_scene;
+    vaxelis::SceneInspector m_inspector; // available but not drawn during gameplay
+    vaxelis::Physics2D m_physics;
+    vaxelis::FileWatcher m_watcher;
+    vaxelis::AssetCache m_assets;
+    vaxelis::TiledMap m_map;
+    vaxelis::Camera2D m_camera;
 
-    int current_level_{1};
-    GameState state_{GameState::Playing};
-    entt::entity player_{entt::null};
-    std::vector<entt::entity> enemies_;
-    std::vector<AABB> hazards_;
-    AABB goal_{};
+    int m_current_level{1};
+    GameState m_state{GameState::Playing};
+    entt::entity m_player{entt::null};
+    std::vector<entt::entity> m_enemies;
+    std::vector<AABB> m_hazards;
+    AABB m_goal{};
 
-    vaxelis::AssetRegistry<vaxelis::SoundHandle> cues_;
+    vaxelis::AssetRegistry<vaxelis::SoundHandle> m_cues;
 };
 
 } // namespace

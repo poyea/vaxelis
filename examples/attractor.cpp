@@ -55,19 +55,19 @@ class Attractor final : public vaxelis::Application {
 
   protected:
     void on_init() override {
-        assets_.init(device());
-        density_.assign(kPixels, 0u);
-        pixels_.assign(kPixels, 0xFF000000u);
+        m_assets.init(device());
+        m_density.assign(kPixels, 0u);
+        m_pixels.assign(kPixels, 0xFF000000u);
 
         const auto tex = device()
                              .create_texture({.width = kSize,
                                               .height = kSize,
                                               .format = vaxelis::rhi::TextureFormat::RGBA8,
-                                              .initial_data = pixels_.data()})
+                                              .initial_data = m_pixels.data()})
                              .value_or(vaxelis::rhi::TextureHandle{});
-        texture_ = assets_.adopt_texture("attractor", tex);
+        m_texture = m_assets.adopt_texture("attractor", tex);
 
-        if (!batch_.init(device()))
+        if (!m_batch.init(device()))
             VX_ERROR("SpriteBatch init failed");
         input().bind_action("pause", SDL_SCANCODE_SPACE);
         input().bind_action("randomize", SDL_SCANCODE_R);
@@ -78,52 +78,52 @@ class Attractor final : public vaxelis::Application {
 
     void on_update(float /*dt*/) override {
         if (input().pressed("pause"))
-            paused_ = !paused_;
+            m_paused = !m_paused;
         if (input().pressed("randomize"))
             randomize();
 
         // A paused field is already on the GPU: no iteration, no remap, no
         // upload until something actually changes it.
-        if (paused_)
+        if (m_paused)
             return;
         accumulate();
         tone_map();
-        device().update_texture(texture_, {.x = 0,
-                                           .y = 0,
-                                           .width = kSize,
-                                           .height = kSize,
-                                           .data = pixels_.data()});
+        device().update_texture(m_texture, {.x = 0,
+                                            .y = 0,
+                                            .width = kSize,
+                                            .height = kSize,
+                                            .data = m_pixels.data()});
     }
 
     void on_render() override {
-        batch_.begin(device(), width(), height());
+        m_batch.begin(device(), width(), height());
         // Square field, so fit it to the short edge instead of stretching.
         const float side = static_cast<float>(std::min(width(), height()));
         const vaxelis::vec2 center{static_cast<float>(width()) * 0.5f,
                                    static_cast<float>(height()) * 0.5f};
-        batch_.draw(texture_, center, {side, side});
-        batch_.end();
+        m_batch.draw(m_texture, center, {side, side});
+        m_batch.end();
     }
 
     void on_imgui() override {
         ImGui::Begin("De Jong attractor");
         bool changed = false;
-        if (ImGui::SliderFloat("a", &a_, -3.0f, 3.0f))
+        if (ImGui::SliderFloat("a", &m_a, -3.0f, 3.0f))
             changed = true;
-        if (ImGui::SliderFloat("b", &b_, -3.0f, 3.0f))
+        if (ImGui::SliderFloat("b", &m_b, -3.0f, 3.0f))
             changed = true;
-        if (ImGui::SliderFloat("c", &c_, -3.0f, 3.0f))
+        if (ImGui::SliderFloat("c", &m_c, -3.0f, 3.0f))
             changed = true;
-        if (ImGui::SliderFloat("d", &d_, -3.0f, 3.0f))
+        if (ImGui::SliderFloat("d", &m_d, -3.0f, 3.0f))
             changed = true;
 
-        if (ImGui::Button(paused_ ? "Resume" : "Pause"))
-            paused_ = !paused_;
+        if (ImGui::Button(m_paused ? "Resume" : "Pause"))
+            m_paused = !m_paused;
         ImGui::SameLine();
         if (ImGui::Button("Randomize"))
             randomize();
-        ImGui::Text("%.1f M points  -  peak %u hits", static_cast<double>(points_) * 1e-6,
-                    max_density_);
+        ImGui::Text("%.1f M points  -  peak %u hits", static_cast<double>(m_points) * 1e-6,
+                    m_max_density);
         ImGui::Text("Space pauses  -  R randomizes");
         ImGui::End();
 
@@ -132,41 +132,41 @@ class Attractor final : public vaxelis::Application {
     }
 
     void on_shutdown() override {
-        batch_.shutdown(device());
-        assets_.shutdown();
+        m_batch.shutdown(device());
+        m_assets.shutdown();
     }
 
   private:
     /// Clears the field and puts the orbit back at its seed. Any parameter edit
     /// invalidates every hit already counted.
     void restart() {
-        std::ranges::fill(density_, 0u);
-        max_density_ = 0;
-        points_ = 0.0;
-        x_ = 0.1f;
-        y_ = 0.1f;
-        paused_ = false;
+        std::ranges::fill(m_density, 0u);
+        m_max_density = 0;
+        m_points = 0.0;
+        m_x = 0.1f;
+        m_y = 0.1f;
+        m_paused = false;
     }
 
     void randomize() {
         std::uniform_real_distribution<float> param(-3.0f, 3.0f);
-        a_ = param(rng_);
-        b_ = param(rng_);
-        c_ = param(rng_);
-        d_ = param(rng_);
+        m_a = param(m_rng);
+        m_b = param(m_rng);
+        m_c = param(m_rng);
+        m_d = param(m_rng);
         restart();
     }
 
     /// Iterates the map and counts hits. The orbit carries over between frames,
     /// which is what makes the image refine instead of restarting.
     void accumulate() {
-        const float a = a_;
-        const float b = b_;
-        const float c = c_;
-        const float d = d_;
-        float x = x_;
-        float y = y_;
-        uint32_t peak = max_density_;
+        const float a = m_a;
+        const float b = m_b;
+        const float c = m_c;
+        const float d = m_d;
+        float x = m_x;
+        float y = m_y;
+        uint32_t peak = m_max_density;
 
         for (uint32_t i = 0; i < kPointsPerFrame; ++i) {
             const float nx = std::sin(a * y) - std::cos(b * x);
@@ -181,53 +181,53 @@ class Attractor final : public vaxelis::Application {
             if (px >= kSize || py >= kSize)
                 continue;
 
-            const uint32_t hits = ++density_[py * kSize + px];
+            const uint32_t hits = ++m_density[py * kSize + px];
             peak = hits > peak ? hits : peak;
         }
 
-        x_ = x;
-        y_ = y;
-        max_density_ = peak;
-        points_ += static_cast<double>(kPointsPerFrame);
+        m_x = x;
+        m_y = y;
+        m_max_density = peak;
+        m_points += static_cast<double>(kPointsPerFrame);
     }
 
     /// Maps densities to colours through a log LUT: one log per palette entry
     /// per frame instead of one per pixel.
     void tone_map() {
-        const uint32_t peak = max_density_ > 0u ? max_density_ : 1u;
+        const uint32_t peak = m_max_density > 0u ? m_max_density : 1u;
         const uint32_t top = std::min(peak, kLutSize - 1u);
         const float norm = 1.0f / std::log(1.0f + static_cast<float>(peak));
         for (uint32_t i = 0; i <= top; ++i)
-            lut_[i] = shade(std::log(1.0f + static_cast<float>(i)) * norm);
+            m_lut[i] = shade(std::log(1.0f + static_cast<float>(i)) * norm);
 
         // Densities past the LUT clamp to its last entry, which is already at
         // full brightness.
         for (uint32_t i = 0; i < kPixels; ++i) {
-            const uint32_t hits = density_[i];
-            pixels_[i] = lut_[hits < top ? hits : top];
+            const uint32_t hits = m_density[i];
+            m_pixels[i] = m_lut[hits < top ? hits : top];
         }
     }
 
-    vaxelis::SpriteBatch batch_;
-    vaxelis::AssetCache assets_;
-    vaxelis::rhi::TextureHandle texture_{};
+    vaxelis::SpriteBatch m_batch;
+    vaxelis::AssetCache m_assets;
+    vaxelis::rhi::TextureHandle m_texture{};
 
-    std::vector<uint32_t> density_;
-    std::vector<uint32_t> pixels_;
-    std::array<uint32_t, kLutSize> lut_{};
-    uint32_t max_density_{0};
-    double points_{0.0};
+    std::vector<uint32_t> m_density;
+    std::vector<uint32_t> m_pixels;
+    std::array<uint32_t, kLutSize> m_lut{};
+    uint32_t m_max_density{0};
+    double m_points{0.0};
 
     // Peter de Jong's original set.
-    float a_{-2.24f};
-    float b_{-0.65f};
-    float c_{-0.43f};
-    float d_{-2.43f};
-    float x_{0.1f};
-    float y_{0.1f};
-    bool paused_{false};
+    float m_a{-2.24f};
+    float m_b{-0.65f};
+    float m_c{-0.43f};
+    float m_d{-2.43f};
+    float m_x{0.1f};
+    float m_y{0.1f};
+    bool m_paused{false};
 
-    std::mt19937 rng_{7u};
+    std::mt19937 m_rng{7u};
 };
 
 } // namespace

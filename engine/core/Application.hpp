@@ -55,15 +55,15 @@ class Application {
     /// Called once before subsystems shut down.
     virtual void on_shutdown() {}
 
-    rhi::IDevice& device() { return *device_; }
-    Input& input() { return input_; }
-    Audio& audio() { return audio_; }
+    rhi::IDevice& device() { return *m_device; }
+    Input& input() { return m_input; }
+    Audio& audio() { return m_audio; }
     /// Framebuffer width in pixels (drawable size; may differ from window size on hidpi).
-    uint32_t width() const { return fb_width_; }
+    uint32_t width() const { return m_fb_width; }
     /// Framebuffer height in pixels.
-    uint32_t height() const { return fb_height_; }
+    uint32_t height() const { return m_fb_height; }
     /// Mutable; the next frame clears with this color.
-    vec4& clear_color() { return clear_color_; }
+    vec4& clear_color() { return m_clear_color; }
 
     /// Fixed-update timestep in seconds (60 Hz).
     static constexpr float kFixedDt = 1.0f / 60.0f;
@@ -73,22 +73,22 @@ class Application {
     void refresh_drawable_size();
     void step_frame(); // one iteration of the main loop (shared desktop/web)
 
-    AppConfig cfg_;
-    SDL_Window* window_{nullptr};
-    void* gl_ctx_{nullptr};
-    std::unique_ptr<rhi::IDevice> device_;
-    ImGuiLayer imgui_;
-    Input input_;
-    Audio audio_;
-    bool imgui_inited_{false};
-    bool audio_inited_{false};
-    Clock clock_;
-    double accumulator_{0.0};
-    vec4 clear_color_{0.1f, 0.12f, 0.15f, 1.0f};
-    uint32_t fb_width_{0};
-    uint32_t fb_height_{0};
-    bool running_{true};
-    bool inited_{false};
+    AppConfig m_cfg;
+    SDL_Window* m_window{nullptr};
+    void* m_gl_ctx{nullptr};
+    std::unique_ptr<rhi::IDevice> m_device;
+    ImGuiLayer m_imgui;
+    Input m_input;
+    Audio m_audio;
+    bool m_imgui_inited{false};
+    bool m_audio_inited{false};
+    Clock m_clock;
+    double m_accumulator{0.0};
+    vec4 m_clear_color{0.1f, 0.12f, 0.15f, 1.0f};
+    uint32_t m_fb_width{0};
+    uint32_t m_fb_height{0};
+    bool m_running{true};
+    bool m_inited{false};
 };
 
 } // namespace vaxelis

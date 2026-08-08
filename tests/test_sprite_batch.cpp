@@ -35,13 +35,13 @@ class RecordingDevice final : public rhi::IDevice {
     int draw_calls{0};
 
     expected<rhi::TextureHandle, rhi::RhiError> create_texture(const rhi::TextureDesc&) override {
-        return rhi::TextureHandle{++next_id_};
+        return rhi::TextureHandle{++m_next_id};
     }
     expected<rhi::ShaderHandle, rhi::RhiError> create_shader(const rhi::ShaderDesc&) override {
-        return rhi::ShaderHandle{++next_id_};
+        return rhi::ShaderHandle{++m_next_id};
     }
     expected<rhi::BufferHandle, rhi::RhiError> create_buffer(const rhi::BufferDesc&) override {
-        return rhi::BufferHandle{++next_id_};
+        return rhi::BufferHandle{++m_next_id};
     }
 
     void destroy(rhi::TextureHandle) override {}
@@ -64,7 +64,7 @@ class RecordingDevice final : public rhi::IDevice {
     }
 
   private:
-    uint32_t next_id_{0};
+    uint32_t m_next_id{0};
 };
 
 /// Corner lookup by exact position; quad corners are computed from halved

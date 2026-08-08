@@ -28,7 +28,7 @@ class FileWatcher {
     int tick(float dt);
 
     /// Sets the polling interval in seconds.
-    void set_interval(float seconds) { interval_ = seconds; }
+    void set_interval(float seconds) { m_interval = seconds; }
 
   private:
     struct Entry {
@@ -36,9 +36,9 @@ class FileWatcher {
         std::filesystem::file_time_type mtime{};
         bool seen{false};
     };
-    std::unordered_map<std::string, Entry> entries_;
-    float accumulator_{0.0f};
-    float interval_{0.25f};
+    std::unordered_map<std::string, Entry> m_entries;
+    float m_accumulator{0.0f};
+    float m_interval{0.25f};
 };
 
 } // namespace vaxelis

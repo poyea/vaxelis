@@ -64,7 +64,7 @@ class Harmonograph final : public vaxelis::Application {
 
   protected:
     void on_init() override {
-        assets_.init(device());
+        m_assets.init(device());
 
         // A single white texel: every dot is this texture tinted per-vertex, so
         // the whole curve stays one draw call.
@@ -75,30 +75,30 @@ class Harmonograph final : public vaxelis::Application {
                                               .format = vaxelis::rhi::TextureFormat::RGBA8,
                                               .initial_data = &white})
                              .value_or(vaxelis::rhi::TextureHandle{});
-        texture_ = assets_.adopt_texture("dot", tex);
+        m_texture = m_assets.adopt_texture("dot", tex);
 
-        if (!batch_.init(device(), kBatchQuads))
+        if (!m_batch.init(device(), kBatchQuads))
             VX_ERROR("SpriteBatch init failed");
         input().bind_action("replay", SDL_SCANCODE_SPACE);
         input().bind_action("randomize", SDL_SCANCODE_R);
 
         clear_color() = {0.04f, 0.04f, 0.06f, 1.0f};
-        samples_.reserve(kSamples);
+        m_samples.reserve(kSamples);
         resample();
     }
 
     void on_update(float dt) override {
         if (input().pressed("replay"))
-            revealed_ = 0.0f;
+            m_revealed = 0.0f;
         if (input().pressed("randomize"))
             randomize();
 
-        const auto total = static_cast<float>(samples_.size());
-        revealed_ = std::min(revealed_ + kRevealRate * dt, total);
+        const auto total = static_cast<float>(m_samples.size());
+        m_revealed = std::min(m_revealed + kRevealRate * dt, total);
     }
 
     void on_render() override {
-        batch_.begin(device(), width(), height());
+        m_batch.begin(device(), width(), height());
         const vaxelis::vec2 center{static_cast<float>(width()) * 0.5f,
                                    static_cast<float>(height()) * 0.5f};
         // Samples reach +-0.9 in unit space, so half the short edge (less a
@@ -107,28 +107,28 @@ class Harmonograph final : public vaxelis::Application {
         const float scale = 0.48f * static_cast<float>(std::min(width(), height()));
         const vaxelis::vec2 dot{2.5f, 2.5f};
 
-        const auto count = static_cast<size_t>(revealed_);
+        const auto count = static_cast<size_t>(m_revealed);
         for (size_t i = 0; i < count; ++i) {
-            const Sample& s = samples_[i];
-            batch_.draw(texture_, center + s.pos * scale, dot, s.color);
+            const Sample& s = m_samples[i];
+            m_batch.draw(m_texture, center + s.pos * scale, dot, s.color);
         }
-        batch_.end();
+        m_batch.end();
     }
 
     void on_imgui() override {
         ImGui::Begin("Harmonograph");
         bool changed = false;
-        changed = pendulum_ui("x pendulum 1", x1_) || changed;
-        changed = pendulum_ui("x pendulum 2", x2_) || changed;
-        changed = pendulum_ui("y pendulum 1", y1_) || changed;
-        changed = pendulum_ui("y pendulum 2", y2_) || changed;
+        changed = pendulum_ui("x pendulum 1", m_x1) || changed;
+        changed = pendulum_ui("x pendulum 2", m_x2) || changed;
+        changed = pendulum_ui("y pendulum 1", m_y1) || changed;
+        changed = pendulum_ui("y pendulum 2", m_y2) || changed;
 
         if (ImGui::Button("Replay"))
-            revealed_ = 0.0f;
+            m_revealed = 0.0f;
         ImGui::SameLine();
         if (ImGui::Button("Randomize"))
             randomize();
-        ImGui::Text("%zu / %u samples", static_cast<size_t>(revealed_), kSamples);
+        ImGui::Text("%zu / %u samples", static_cast<size_t>(m_revealed), kSamples);
         ImGui::Text("Space replays  -  R randomizes");
         ImGui::End();
 
@@ -136,13 +136,13 @@ class Harmonograph final : public vaxelis::Application {
         // per frame no matter how many sliders the user drags.
         if (changed) {
             resample();
-            revealed_ = 0.0f;
+            m_revealed = 0.0f;
         }
     }
 
     void on_shutdown() override {
-        batch_.shutdown(device());
-        assets_.shutdown();
+        m_batch.shutdown(device());
+        m_assets.shutdown();
     }
 
   private:
@@ -164,14 +164,14 @@ class Harmonograph final : public vaxelis::Application {
     /// Rebuilds the cached curve. Only runs when a parameter moved, never on a
     /// frame that is merely drawing what is already there.
     void resample() {
-        samples_.clear();
+        m_samples.clear();
         const float step = kSpan / static_cast<float>(kSamples - 1);
         const float inv = 1.0f / static_cast<float>(kSamples - 1);
         for (uint32_t i = 0; i < kSamples; ++i) {
             const float t = static_cast<float>(i) * step;
-            const vaxelis::vec2 p{pendulum_at(x1_, t) + pendulum_at(x2_, t),
-                                  pendulum_at(y1_, t) + pendulum_at(y2_, t)};
-            samples_.push_back({p, ramp(static_cast<float>(i) * inv)});
+            const vaxelis::vec2 p{pendulum_at(m_x1, t) + pendulum_at(m_x2, t),
+                                  pendulum_at(m_y1, t) + pendulum_at(m_y2, t)};
+            m_samples.push_back({p, ramp(static_cast<float>(i) * inv)});
         }
     }
 
@@ -179,30 +179,30 @@ class Harmonograph final : public vaxelis::Application {
         std::uniform_real_distribution<float> freq(1.0f, 6.0f);
         std::uniform_real_distribution<float> phase(0.0f, kTau);
         std::uniform_real_distribution<float> decay(0.004f, 0.03f);
-        for (Pendulum* p : {&x1_, &x2_, &y1_, &y2_}) {
+        for (Pendulum* p : {&m_x1, &m_x2, &m_y1, &m_y2}) {
             // Snap most frequencies near a whole number: exact ratios close the
             // figure, the leftover fraction is what makes it precess.
-            p->freq = std::round(freq(rng_)) + 0.01f * std::round(freq(rng_));
-            p->phase = phase(rng_);
-            p->decay = decay(rng_);
+            p->freq = std::round(freq(m_rng)) + 0.01f * std::round(freq(m_rng));
+            p->phase = phase(m_rng);
+            p->decay = decay(m_rng);
         }
         resample();
-        revealed_ = 0.0f;
+        m_revealed = 0.0f;
     }
 
-    vaxelis::SpriteBatch batch_;
-    vaxelis::AssetCache assets_;
-    vaxelis::rhi::TextureHandle texture_{};
+    vaxelis::SpriteBatch m_batch;
+    vaxelis::AssetCache m_assets;
+    vaxelis::rhi::TextureHandle m_texture{};
 
-    std::vector<Sample> samples_;
-    float revealed_{0.0f};
+    std::vector<Sample> m_samples;
+    float m_revealed{0.0f};
 
-    Pendulum x1_{2.0f, 0.0f, 0.018f};
-    Pendulum x2_{2.01f, 1.6f, 0.010f};
-    Pendulum y1_{3.0f, 0.8f, 0.014f};
-    Pendulum y2_{3.02f, 2.4f, 0.022f};
+    Pendulum m_x1{2.0f, 0.0f, 0.018f};
+    Pendulum m_x2{2.01f, 1.6f, 0.010f};
+    Pendulum m_y1{3.0f, 0.8f, 0.014f};
+    Pendulum m_y2{3.02f, 2.4f, 0.022f};
 
-    std::mt19937 rng_{1337u};
+    std::mt19937 m_rng{1337u};
 };
 
 } // namespace

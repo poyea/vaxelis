@@ -29,7 +29,7 @@ class Physics2D {
     /// Destroys the world; all body/shape handles become invalid.
     void shutdown();
     /// True while a valid world exists.
-    bool ready() const { return b2World_IsValid(world_); }
+    bool ready() const { return b2World_IsValid(m_world); }
 
     /// Hooks entt destroy-signals so that removing RigidBody2D / BoxCollider2D
     /// (or destroying the owning entity) releases the underlying Box2D handles.
@@ -52,17 +52,17 @@ class Physics2D {
     /// dynamic body is also woken so it doesn't sleep through the change.
     void sync_from_scene(Scene& scene);
 
-    float pixels_per_meter() const { return ppm_; }
-    b2WorldId world() const { return world_; }
+    float pixels_per_meter() const { return m_ppm; }
+    b2WorldId world() const { return m_world; }
 
   private:
     void on_rb_destroyed(entt::registry& reg, entt::entity e);
     void on_col_destroyed(entt::registry& reg, entt::entity e);
 
-    b2WorldId world_{b2_nullWorldId};
-    Config cfg_{};
-    float ppm_{100.0f};
-    float inv_ppm_{0.01f};
+    b2WorldId m_world{b2_nullWorldId};
+    Config m_cfg{};
+    float m_ppm{100.0f};
+    float m_inv_ppm{0.01f};
 };
 
 } // namespace vaxelis

@@ -5,21 +5,21 @@
 namespace vaxelis {
 
 void FileWatcher::watch(std::string path, Callback cb) {
-    entries_[path] = Entry{std::move(cb), {}, false};
+    m_entries[path] = Entry{std::move(cb), {}, false};
 }
 
 void FileWatcher::unwatch(const std::string& path) {
-    entries_.erase(path);
+    m_entries.erase(path);
 }
 
 int FileWatcher::tick(float dt) {
-    accumulator_ += dt;
-    if (accumulator_ < interval_)
+    m_accumulator += dt;
+    if (m_accumulator < m_interval)
         return 0;
-    accumulator_ = 0.0f;
+    m_accumulator = 0.0f;
 
     int changed = 0;
-    for (auto& [path, e] : entries_) {
+    for (auto& [path, e] : m_entries) {
         std::error_code ec;
         auto t = std::filesystem::last_write_time(path, ec);
         if (ec)

@@ -5,48 +5,48 @@
 namespace vaxelis {
 
 void Input::begin_frame() {
-    prev_ = curr_;
+    m_prev = m_curr;
 }
 
 void Input::on_event(const SDL_Event& ev) {
     if (ev.type == SDL_EVENT_KEY_DOWN || ev.type == SDL_EVENT_KEY_UP) {
         const auto sc = ev.key.scancode;
         if (sc >= 0 && static_cast<size_t>(sc) < kNumKeys) {
-            curr_[static_cast<size_t>(sc)] = (ev.type == SDL_EVENT_KEY_DOWN);
+            m_curr[static_cast<size_t>(sc)] = (ev.type == SDL_EVENT_KEY_DOWN);
         }
     }
 }
 
 void Input::bind_action(std::string name, SDL_Scancode key) {
-    actions_[std::move(name)].keys.push_back(key);
+    m_actions[std::move(name)].keys.push_back(key);
 }
 
 void Input::bind_action(std::string name, std::initializer_list<SDL_Scancode> keys) {
-    auto& b = actions_[std::move(name)];
+    auto& b = m_actions[std::move(name)];
     for (auto k : keys)
         b.keys.push_back(k);
 }
 
 void Input::clear_actions() {
-    actions_.clear();
+    m_actions.clear();
 }
 
 bool Input::down(SDL_Scancode k) const {
     auto i = static_cast<size_t>(k);
-    return i < kNumKeys && curr_[i];
+    return i < kNumKeys && m_curr[i];
 }
 bool Input::pressed(SDL_Scancode k) const {
     auto i = static_cast<size_t>(k);
-    return i < kNumKeys && curr_[i] && !prev_[i];
+    return i < kNumKeys && m_curr[i] && !m_prev[i];
 }
 bool Input::released(SDL_Scancode k) const {
     auto i = static_cast<size_t>(k);
-    return i < kNumKeys && !curr_[i] && prev_[i];
+    return i < kNumKeys && !m_curr[i] && m_prev[i];
 }
 
 bool Input::down(std::string_view name) const {
-    auto it = actions_.find(name);
-    if (it == actions_.end())
+    auto it = m_actions.find(name);
+    if (it == m_actions.end())
         return false;
     for (auto k : it->second.keys)
         if (down(k))
@@ -54,8 +54,8 @@ bool Input::down(std::string_view name) const {
     return false;
 }
 bool Input::pressed(std::string_view name) const {
-    auto it = actions_.find(name);
-    if (it == actions_.end())
+    auto it = m_actions.find(name);
+    if (it == m_actions.end())
         return false;
     for (auto k : it->second.keys)
         if (pressed(k))
@@ -63,8 +63,8 @@ bool Input::pressed(std::string_view name) const {
     return false;
 }
 bool Input::released(std::string_view name) const {
-    auto it = actions_.find(name);
-    if (it == actions_.end())
+    auto it = m_actions.find(name);
+    if (it == m_actions.end())
         return false;
     for (auto k : it->second.keys)
         if (released(k))
