@@ -29,16 +29,20 @@ std::string_view to_string(RhiError);
 /// Opaque texture handle. Trivially copyable, cheap to pass around. 0 == null.
 struct TextureHandle {
     uint32_t id{0};
+    /// False for a default-constructed (null) handle, and for one whose texture
+    /// was never created. Drawing with a null handle is a silent no-op.
     constexpr bool valid() const { return id != 0; }
 };
 /// Opaque shader-program handle. Trivially copyable, cheap to pass around. 0 == null.
 struct ShaderHandle {
     uint32_t id{0};
+    /// False for a default-constructed (null) handle. See TextureHandle::valid().
     constexpr bool valid() const { return id != 0; }
 };
 /// Opaque buffer handle. Trivially copyable, cheap to pass around. 0 == null.
 struct BufferHandle {
     uint32_t id{0};
+    /// False for a default-constructed (null) handle. See TextureHandle::valid().
     constexpr bool valid() const { return id != 0; }
 };
 
@@ -88,12 +92,25 @@ class IDevice {
   public:
     virtual ~IDevice() = default;
 
+    /// Uploads pixels into a new GPU texture. The desc's `initial_data` may be
+    /// null to allocate storage now and fill it later with update_texture().
+    /// @return the new handle, or UnsupportedFormat / OutOfMemory on failure.
     virtual vaxelis::expected<TextureHandle, RhiError> create_texture(const TextureDesc&) = 0;
+    /// Compiles and links a vertex + fragment shader pair.
+    /// @return the new handle, or ShaderCompileFailed / ProgramLinkFailed, with
+    /// the driver's error text logged.
     virtual vaxelis::expected<ShaderHandle, RhiError> create_shader(const ShaderDesc&) = 0;
+    /// Allocates a vertex, index or uniform buffer, optionally filling it from
+    /// the desc's `initial_data`.
+    /// @return the new handle, or OutOfMemory on failure.
     virtual vaxelis::expected<BufferHandle, RhiError> create_buffer(const BufferDesc&) = 0;
 
+    /// Releases the texture. Null handles are ignored; using a handle after
+    /// destroying it is a bug the device does not detect.
     virtual void destroy(TextureHandle) = 0;
+    /// Releases the shader program. See destroy(TextureHandle).
     virtual void destroy(ShaderHandle) = 0;
+    /// Releases the buffer. See destroy(TextureHandle).
     virtual void destroy(BufferHandle) = 0;
 
     /// Uploads `data` into the buffer starting at `offset_bytes`.
