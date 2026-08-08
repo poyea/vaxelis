@@ -113,8 +113,7 @@ TEST(SpriteBatch, SubRectMapsMinUvToTheTopLeftCorner) {
 
     // uv_rect is (min_u, min_v, max_u, max_v): the top-left half of an atlas.
     batch.begin(dev, 100, 100);
-    batch.draw(tex, {50.0f, 50.0f}, {20.0f, 20.0f}, vec4{0.25f, 0.0f, 0.75f, 0.5f},
-               vec4{1.0f});
+    batch.draw(tex, {50.0f, 50.0f}, {20.0f, 20.0f}, vec4{0.25f, 0.0f, 0.75f, 0.5f}, vec4{1.0f});
     batch.end();
 
     ASSERT_EQ(dev.vertices.size(), 4u);
