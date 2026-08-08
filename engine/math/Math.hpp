@@ -14,9 +14,14 @@
 
 namespace vaxelis {
 
+/// 2D vector. Doubles as a screen/world position, a size, or a UV pair.
 using vec2 = glm::vec2;
+/// 3D vector.
 using vec3 = glm::vec3;
+/// 4D vector. Also used for RGBA colours and for (min_u, min_v, max_u, max_v)
+/// uv rectangles.
 using vec4 = glm::vec4;
+/// 4x4 matrix, used for transforms and projections even in the 2D paths.
 using mat4 = glm::mat4;
 
 /// Axis-aligned 2D bounding box.

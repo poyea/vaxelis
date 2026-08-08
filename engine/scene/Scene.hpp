@@ -18,10 +18,12 @@ class SpriteBatch;
 /// sync; touching the registry directly skips those invariants.
 class Scene {
   public:
+    /// Creates an empty scene holding just the root entity.
     Scene();
 
     /// Direct registry access; see the class note about hierarchy invariants.
     entt::registry& registry() { return m_registry; }
+    /// Read-only registry access, for systems that only query.
     const entt::registry& registry() const { return m_registry; }
     /// The implicit root entity that parents all top-level nodes.
     entt::entity root() const { return m_root; }

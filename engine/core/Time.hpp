@@ -7,8 +7,10 @@ namespace vaxelis {
 /// Frame timer over std::chrono::steady_clock.
 class Clock {
   public:
+    /// Monotonic source, so the clock is unaffected by wall-clock adjustments.
     using clock = std::chrono::steady_clock;
 
+    /// Starts the clock; both the elapsed and the per-tick timer begin now.
     Clock() : m_start(clock::now()), m_last(m_start) {}
 
     /// Returns seconds since the previous call to tick().

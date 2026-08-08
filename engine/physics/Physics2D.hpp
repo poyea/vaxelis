@@ -52,7 +52,10 @@ class Physics2D {
     /// dynamic body is also woken so it doesn't sleep through the change.
     void sync_from_scene(Scene& scene);
 
+    /// Scene units per Box2D metre. Scene positions are divided by this on the
+    /// way into the solver and multiplied by it on the way back out.
     float pixels_per_meter() const { return m_ppm; }
+    /// The underlying Box2D world, for calls the wrapper does not expose.
     b2WorldId world() const { return m_world; }
 
   private:
