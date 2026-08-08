@@ -186,3 +186,86 @@ TEST(World, StaleHandlesAreRejectedNotFollowed) {
     EXPECT_EQ(w.add<Pos>(e), nullptr);
     w.remove<Pos>(e); // must not crash
 }
+
+TEST(World, EachVisitsOnlyEntitiesCarryingEveryComponent) {
+    World w;
+    const Entity pos_only = w.create();
+    w.add<Pos>(pos_only, Pos{1.0f, 0.0f});
+
+    const Entity both = w.create();
+    w.add<Pos>(both, Pos{2.0f, 0.0f});
+    w.add<Vel>(both, Vel{10.0f});
+
+    const Entity vel_only = w.create();
+    w.add<Vel>(vel_only, Vel{99.0f});
+
+    int visits = 0;
+    float seen_x = 0.0f;
+    w.each<Pos, Vel>([&](Pos& p, Vel& v) {
+        ++visits;
+        seen_x = p.x;
+        v.dx += 1.0f;
+    });
+
+    EXPECT_EQ(visits, 1); // only `both` has the pair
+    EXPECT_FLOAT_EQ(seen_x, 2.0f);
+    EXPECT_FLOAT_EQ(w.try_get<Vel>(both)->dx, 11.0f); // writes land in storage
+    EXPECT_FLOAT_EQ(w.try_get<Vel>(vel_only)->dx, 99.0f);
+}
+
+TEST(World, EachSpansEveryArchetypeThatContainsTheQuery) {
+    World w;
+    // Same query component, three different shapes: {Pos}, {Pos,Vel},
+    // {Pos,Health}. All three must be visited.
+    const Entity a = w.create();
+    w.add<Pos>(a, Pos{1.0f, 0.0f});
+    const Entity b = w.create();
+    w.add<Pos>(b, Pos{2.0f, 0.0f});
+    w.add<Vel>(b, Vel{0.0f});
+    const Entity c = w.create();
+    w.add<Pos>(c, Pos{3.0f, 0.0f});
+    w.add<Health>(c, Health{1});
+
+    float total = 0.0f;
+    int visits = 0;
+    w.each<Pos>([&](Pos& p) {
+        total += p.x;
+        ++visits;
+    });
+
+    EXPECT_EQ(visits, 3);
+    EXPECT_FLOAT_EQ(total, 6.0f);
+    EXPECT_EQ(w.archetype_count(), 4u); // empty, {Pos}, {Pos,Vel}, {Pos,Health}
+}
+
+TEST(World, EachEntityHandsBackUsableHandles) {
+    World w;
+    for (int i = 0; i < 5; ++i)
+        w.add<Health>(w.create(), Health{i});
+
+    std::vector<Entity> seen;
+    w.each_entity<Health>([&](Entity e, Health& h) {
+        seen.push_back(e);
+        h.hp += 100;
+    });
+
+    ASSERT_EQ(seen.size(), 5u);
+    for (const Entity e : seen) {
+        EXPECT_TRUE(w.alive(e));
+        ASSERT_NE(w.try_get<Health>(e), nullptr);
+        EXPECT_GE(w.try_get<Health>(e)->hp, 100);
+    }
+}
+
+TEST(World, EachSkipsEmptiedArchetypes) {
+    World w;
+    const Entity e = w.create();
+    w.add<Pos>(e, Pos{1.0f, 0.0f});
+    w.destroy(e);
+
+    // The {Pos} archetype still exists but holds no rows.
+    int visits = 0;
+    w.each<Pos>([&](Pos&) { ++visits; });
+    EXPECT_EQ(visits, 0);
+    EXPECT_EQ(w.archetype_count(), 2u);
+}

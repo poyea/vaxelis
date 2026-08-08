@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <span>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -104,6 +105,46 @@ class World {
         if (rec == nullptr || !rec->table->archetype.has(component_id<T>()))
             return nullptr;
         return &rec->table->archetype.get<T>(rec->row);
+    }
+
+    /// Calls `fn(Ts&...)` for every entity carrying all of `Ts`.
+    ///
+    /// This is what the column layout is for: each matching archetype hands
+    /// over its columns once, and the loop then walks them in memory order with
+    /// no per-entity lookup. Archetypes that lack any of `Ts` are skipped whole
+    /// on a single mask test.
+    ///
+    /// Do not add, remove or destroy while iterating -- a structural change
+    /// reshapes the very storage being walked. Collect the entities to change
+    /// and apply afterwards.
+    template <class... Ts, class Fn> void each(Fn&& fn) {
+        const Signature query = signature_of<Ts...>();
+        for (auto& [sig, table] : m_tables) {
+            if (!sig.contains(query))
+                continue;
+            const size_t rows = table->archetype.size();
+            if (rows == 0)
+                continue;
+            // One column lookup per archetype, not per row.
+            auto columns = std::tuple<std::span<Ts>...>{table->archetype.column<Ts>()...};
+            for (size_t row = 0; row < rows; ++row)
+                fn(std::get<std::span<Ts>>(columns)[row]...);
+        }
+    }
+
+    /// As each(), but the callback also receives the entity: `fn(Entity, Ts&...)`.
+    template <class... Ts, class Fn> void each_entity(Fn&& fn) {
+        const Signature query = signature_of<Ts...>();
+        for (auto& [sig, table] : m_tables) {
+            if (!sig.contains(query))
+                continue;
+            const size_t rows = table->archetype.size();
+            if (rows == 0)
+                continue;
+            auto columns = std::tuple<std::span<Ts>...>{table->archetype.column<Ts>()...};
+            for (size_t row = 0; row < rows; ++row)
+                fn(table->entities[row], std::get<std::span<Ts>>(columns)[row]...);
+        }
     }
 
   private:
