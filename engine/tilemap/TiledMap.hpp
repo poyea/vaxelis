@@ -128,6 +128,8 @@ struct ChunkRange {
     int x1{-1};
     int y1{-1};
 
+    /// True when the view rect touches no chunk at all, so the caller can
+    /// skip the layer outright.
     constexpr bool empty() const { return x0 > x1 || y0 > y1; }
 };
 

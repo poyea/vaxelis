@@ -29,7 +29,10 @@ struct AppConfig {
 /// reason logged. `run()` returns non-zero if init failed.
 class Application {
   public:
+    /// Stores the config only; nothing is created until init(). Never throws,
+    /// so a failure to start is reported by init() returning false.
     explicit Application(AppConfig cfg) noexcept;
+    /// Shuts down any subsystem still running.
     virtual ~Application();
 
     Application(const Application&) = delete;

@@ -17,6 +17,7 @@ struct TextureAsset {
     uint32_t width{0};
     uint32_t height{0};
 
+    /// True once the texture exists on the GPU.
     constexpr bool valid() const { return handle.valid(); }
 };
 

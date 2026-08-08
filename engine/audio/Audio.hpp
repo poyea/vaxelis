@@ -20,7 +20,9 @@ struct SoundHandle {
 /// that as a soft failure and continue silently rather than aborting.
 class Audio {
   public:
+    /// Constructs the wrapper without touching the audio device; call init().
     Audio();
+    /// Releases any sounds still loaded and stops the engine.
     ~Audio();
 
     Audio(const Audio&) = delete;
@@ -46,6 +48,7 @@ class Audio {
 
     /// Sets the engine-wide volume (1.0 = unity gain).
     void set_master_volume(float v);
+    /// The volume last passed to set_master_volume(); 1.0 unless changed.
     float master_volume() const { return m_master_volume; }
 
   private:

@@ -16,6 +16,7 @@ namespace vaxelis {
 /// interval is 250ms; call tick(dt) every frame.
 class FileWatcher {
   public:
+    /// Fired with the watched path each time its mtime changes.
     using Callback = std::function<void(const std::string& path)>;
 
     /// Starts watching `path`; `cb` fires on each detected change.
