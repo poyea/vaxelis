@@ -16,7 +16,7 @@ namespace {
 // to a uniquely-named file under the temp dir and returns its path.
 std::string write_temp_script(const char* tag) {
     const auto path =
-        std::filesystem::temp_directory_path() / ("vaxelis_test_" + std::string(tag) + ".lua");
+        std::filesystem::temp_directory_path() / ("vaxelis-test-" + std::string(tag) + ".lua");
     std::ofstream f(path);
     f << "function on_update(dt) end\n";
     f.close();

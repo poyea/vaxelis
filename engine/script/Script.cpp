@@ -138,7 +138,7 @@ void ScriptHost::update(float dt, Scene& scene) {
 
         if (!sc.loaded) {
             if (sc.instance_key.empty()) {
-                sc.instance_key = "script_" + std::to_string(m_impl->next_instance_id++);
+                sc.instance_key = "script" + std::to_string(m_impl->next_instance_id++);
             }
             // Create the per-instance subtable, expose entity_id, then run the
             // script with that table as its `self`/environment-lite.
