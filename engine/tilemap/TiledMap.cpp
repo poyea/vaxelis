@@ -258,9 +258,7 @@ void build_cache(TiledMap& m, int chunk_tiles) {
                 const vec2 pos{(static_cast<float>(x) + 0.5f) * tile_size.x,
                                (static_cast<float>(y) + 0.5f) * tile_size.y};
                 const size_t bucket = static_cast<size_t>(slot) * chunk_count + chunk_of(x, y);
-                // SpriteBatch writes uv_rect.w to the top-screen vertex, so
-                // store v_bottom in .y and v_top in .w.
-                cache.quads[cursor[bucket]++] = TileQuad{pos, vec4{u0, v1, u1, v0}};
+                cache.quads[cursor[bucket]++] = TileQuad{pos, vec4{u0, v0, u1, v1}};
             }
         }
     }

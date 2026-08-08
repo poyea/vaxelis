@@ -173,11 +173,13 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect
     const float y0 = pos.y - hh, y1 = pos.y + hh;
     const float u0 = uv_rect.x, v0 = uv_rect.y;
     const float u1 = uv_rect.z, v1 = uv_rect.w;
-    // UVs: v0 is the top edge (matches the screen-space top-left ortho).
-    verts_.push_back({x0, y0, u0, v1, color.r, color.g, color.b, color.a});
-    verts_.push_back({x1, y0, u1, v1, color.r, color.g, color.b, color.a});
-    verts_.push_back({x1, y1, u1, v0, color.r, color.g, color.b, color.a});
-    verts_.push_back({x0, y1, u0, v0, color.r, color.g, color.b, color.a});
+    // v0 is the top edge: textures upload row 0 first, so v = 0 is the image's
+    // top row, and the screen-space ortho is y-down, so the smaller v belongs on
+    // the smaller y. Pairing them the other way flips every sprite vertically.
+    verts_.push_back({x0, y0, u0, v0, color.r, color.g, color.b, color.a});
+    verts_.push_back({x1, y0, u1, v0, color.r, color.g, color.b, color.a});
+    verts_.push_back({x1, y1, u1, v1, color.r, color.g, color.b, color.a});
+    verts_.push_back({x0, y1, u0, v1, color.r, color.g, color.b, color.a});
     ++quads_;
 }
 

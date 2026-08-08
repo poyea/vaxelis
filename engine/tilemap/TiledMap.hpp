@@ -27,7 +27,7 @@ struct TilesetRef {
 };
 
 /// One tile ready for submission: the world-space center of the quad plus its
-/// uv rect in SpriteBatch's convention (v_bottom in .y, v_top in .w). Every tile
+/// uv rect as (min_u, min_v, max_u, max_v), min_v being the top. Every tile
 /// is drawn at the map's tile size, so no per-quad extent is stored.
 struct TileQuad {
     vec2 pos{0.0f, 0.0f};

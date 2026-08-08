@@ -91,14 +91,14 @@ TEST(TiledMap, LoadBuildsAChunkedDrawCache) {
     EXPECT_EQ(cache.batches[0].runs[0].count, 4u);
 
     // First quad is gid 1 at cell (1,0): centered in its cell, sampling the
-    // top-left tile of a 2x2 atlas. UVs carry v_bottom in .y and v_top in .w.
+    // top-left tile of a 2x2 atlas as (min_u, min_v, max_u, max_v).
     const auto& q = cache.quads[0];
     EXPECT_FLOAT_EQ(q.pos.x, 24.0f);
     EXPECT_FLOAT_EQ(q.pos.y, 8.0f);
     EXPECT_FLOAT_EQ(q.uv.x, 0.0f);
-    EXPECT_FLOAT_EQ(q.uv.y, 0.5f);
+    EXPECT_FLOAT_EQ(q.uv.y, 0.0f);
     EXPECT_FLOAT_EQ(q.uv.z, 0.5f);
-    EXPECT_FLOAT_EQ(q.uv.w, 0.0f);
+    EXPECT_FLOAT_EQ(q.uv.w, 0.5f);
 }
 
 TEST(TiledMap, TilesAreBucketedPerChunk) {

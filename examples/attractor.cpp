@@ -97,13 +97,11 @@ class Attractor final : public vaxelis::Application {
 
     void on_render() override {
         batch_.begin(device(), width(), height());
-        // Square field, so fit it to the short edge instead of stretching. The
-        // uv rect carries v_bottom in .y and v_top in .w so row 0 lands on top.
+        // Square field, so fit it to the short edge instead of stretching.
         const float side = static_cast<float>(std::min(width(), height()));
         const vaxelis::vec2 center{static_cast<float>(width()) * 0.5f,
                                    static_cast<float>(height()) * 0.5f};
-        batch_.draw(texture_, center, {side, side}, vaxelis::vec4{0.0f, 1.0f, 1.0f, 0.0f},
-                    vaxelis::vec4{1.0f});
+        batch_.draw(texture_, center, {side, side});
         batch_.end();
     }
 

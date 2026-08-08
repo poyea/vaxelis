@@ -161,10 +161,7 @@ class Mandelbrot final : public vaxelis::Application {
     void on_render() override {
         batch_.begin(device(), width(), height());
         const vaxelis::vec2 size{static_cast<float>(width()), static_cast<float>(height())};
-        // v_bottom in .y and v_top in .w, so texture row 0 lands on the top
-        // scanline; SpriteBatch's default uv rect would flip it vertically.
-        batch_.draw(texture_, size * 0.5f, size, vaxelis::vec4{0.0f, 1.0f, 1.0f, 0.0f},
-                    vaxelis::vec4{1.0f});
+        batch_.draw(texture_, size * 0.5f, size);
         batch_.end();
     }
 
