@@ -6,6 +6,7 @@ add_library(vaxelis_engine STATIC
     core/Time.cpp
     core/Uuid.cpp
     core/Application.cpp
+    ecs/ComponentType.cpp
     input/Input.cpp
     physics/Physics2D.cpp
     rhi/Rhi.cpp
