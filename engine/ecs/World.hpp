@@ -9,6 +9,7 @@
 #include <memory>
 #include <span>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "engine/ecs/Archetype.hpp"
@@ -24,6 +25,10 @@ namespace vaxelis::ecs {
 /// component is a structural change: the entity's row moves to the archetype
 /// for its new signature. An entity with no components at all still has a row,
 /// in the empty archetype, so it can be created before it is filled in.
+///
+/// References and pointers into component storage are invalidated by any
+/// structural change, including one on a different entity, because it can grow
+/// or reshuffle a column. Fetch them again after add(), remove() or destroy().
 class World {
   public:
     World();
@@ -50,6 +55,56 @@ class World {
     /// interest to tests and tooling: it counts the shapes in play, not the
     /// entities.
     size_t archetype_count() const { return m_tables.size(); }
+
+    /// True when `e` currently carries `T`.
+    template <class T> bool has(Entity e) const {
+        const Record* rec = find(e);
+        return rec != nullptr && rec->table->archetype.has(component_id<T>());
+    }
+
+    /// Gives `e` a `T`, moving it to the archetype for its new shape.
+    ///
+    /// Adding a component the entity already has overwrites it in place rather
+    /// than migrating. Returns nullptr for a stale handle, which is logged: a
+    /// caller that knows the entity is alive can dereference without checking.
+    template <class T> T* add(Entity e, T value = T{}) {
+        Record* rec = find(e);
+        if (rec == nullptr) {
+            report_stale("add");
+            return nullptr;
+        }
+        const ComponentId id = component_id<T>();
+        if (!rec->table->archetype.has(id)) {
+            Signature target = rec->table->archetype.signature();
+            target.set(id);
+            migrate(e, *rec, target);
+        }
+        T& slot = rec->table->archetype.get<T>(rec->row);
+        slot = std::move(value);
+        return &slot;
+    }
+
+    /// Takes `T` away from `e`. A no-op when the entity is stale or does not
+    /// have the component.
+    template <class T> void remove(Entity e) {
+        Record* rec = find(e);
+        if (rec == nullptr)
+            return;
+        const ComponentId id = component_id<T>();
+        if (!rec->table->archetype.has(id))
+            return;
+        Signature target = rec->table->archetype.signature();
+        target.reset(id);
+        migrate(e, *rec, target);
+    }
+
+    /// Pointer to `e`'s `T`, or nullptr when the entity is stale or lacks it.
+    template <class T> T* try_get(Entity e) {
+        Record* rec = find(e);
+        if (rec == nullptr || !rec->table->archetype.has(component_id<T>()))
+            return nullptr;
+        return &rec->table->archetype.get<T>(rec->row);
+    }
 
   private:
     /// One archetype plus the entity owning each of its rows, kept parallel so
@@ -78,6 +133,19 @@ class World {
     /// Removes `row` from `table` and repoints whichever entity got swapped
     /// into the gap.
     void unseat(Table& table, size_t row);
+
+    /// Moves `e`'s row to the archetype for `target`, carrying across every
+    /// component the two shapes share and default-constructing the rest, then
+    /// dropping the old row. `rec` is updated to the new home.
+    void migrate(Entity e, Record& rec, Signature target);
+
+    /// The record for a live entity, or nullptr when the handle is stale.
+    Record* find(Entity e);
+    const Record* find(Entity e) const;
+
+    /// Logs use of a stale handle. Out of line so this header does not drag the
+    /// logger into everything that includes it.
+    static void report_stale(const char* op);
 
     std::unordered_map<Signature, std::unique_ptr<Table>> m_tables;
     std::vector<Record> m_records;

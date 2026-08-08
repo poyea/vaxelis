@@ -1,5 +1,7 @@
 #include "engine/ecs/World.hpp"
 
+#include "engine/core/Log.hpp"
+
 namespace vaxelis::ecs {
 
 World::World() {
@@ -9,6 +11,18 @@ World::World() {
 }
 
 World::~World() = default;
+
+void World::report_stale(const char* op) {
+    VX_ERROR("ecs: World::{} called with a stale entity handle", op);
+}
+
+World::Record* World::find(Entity e) {
+    return alive(e) ? &m_records[e.index] : nullptr;
+}
+
+const World::Record* World::find(Entity e) const {
+    return alive(e) ? &m_records[e.index] : nullptr;
+}
 
 World::Table& World::table_for(Signature sig, std::span<const ComponentId> ids) {
     if (auto it = m_tables.find(sig); it != m_tables.end())
@@ -36,6 +50,33 @@ void World::unseat(Table& table, size_t row) {
     table.entities.pop_back();
 }
 
+void World::migrate(Entity e, Record& rec, Signature target) {
+    Table& from = *rec.table;
+
+    // The destination needs an id list, not just the mask: keep the source's
+    // ids that survive, then pick up whichever id the change added.
+    std::vector<ComponentId> ids;
+    ids.reserve(from.archetype.component_ids().size() + 1);
+    for (const ComponentId id : from.archetype.component_ids()) {
+        if (target.test(id))
+            ids.push_back(id);
+    }
+    for (ComponentId id = 0; id < registered_component_count(); ++id) {
+        if (target.test(id) && !from.archetype.has(id))
+            ids.push_back(id);
+    }
+
+    Table& to = table_for(target, ids);
+    const size_t old_row = rec.row;
+    rec.row = to.archetype.move_row_from(from.archetype, old_row);
+    rec.table = &to;
+    to.entities.push_back(e);
+
+    // move_row_from deliberately leaves the source row behind; dropping it here
+    // is what stops the entity from existing in two archetypes at once.
+    unseat(from, old_row);
+}
+
 Entity World::create() {
     uint32_t index = 0;
     if (!m_free.empty()) {
@@ -47,7 +88,7 @@ Entity World::create() {
     }
 
     Record& rec = m_records[index];
-    // Generation 0 is reserved for kNoEntity, so a recycled slot skips it.
+    // Generation 0 is reserved for kNoEntity, so a fresh slot starts at 1.
     if (rec.generation == 0)
         rec.generation = 1;
     rec.alive = true;
@@ -74,8 +115,8 @@ void World::destroy(Entity e) {
     rec.table = nullptr;
     rec.row = 0;
     rec.alive = false;
-    // Outstanding handles to this entity now fail the generation check. The
-    // counter wrapping would take 4 billion reuses of one slot.
+    // Outstanding handles now fail the generation check. Wrapping would take
+    // four billion reuses of one slot.
     ++rec.generation;
     if (rec.generation == 0)
         rec.generation = 1;
