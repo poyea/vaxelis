@@ -1,5 +1,13 @@
 find_package(Doxygen REQUIRED)
 
+# Graphviz is optional. When it is present Doxygen draws the class hierarchies;
+# without it the build still succeeds, just without diagrams.
+if(TARGET Doxygen::dot)
+    set(VAXELIS_DOXYGEN_HAVE_DOT YES)
+else()
+    set(VAXELIS_DOXYGEN_HAVE_DOT NO)
+endif()
+
 set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
 set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
 

@@ -1,14 +1,51 @@
 PROJECT_NAME           = @PROJECT_NAME@
 PROJECT_NUMBER         = @PROJECT_VERSION@
+PROJECT_BRIEF          = "C++23 hybrid 2D/3D game engine"
 OUTPUT_DIRECTORY       = @CMAKE_CURRENT_BINARY_DIR@/site
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
 RECURSIVE              = YES
 QUIET                  = YES
-EXTRACT_ALL            = YES
+
+# Public API only: private members carry an m_ prefix and are of no interest to
+# a caller, and EXTRACT_ALL would bury the documented API under every internal
+# typedef. Turning it off also makes WARN_IF_UNDOCUMENTED meaningful, so gaps
+# show up in the build log instead of silently rendering as empty pages.
+EXTRACT_ALL            = NO
+EXTRACT_STATIC         = YES
+HIDE_UNDOC_MEMBERS     = NO
+WARN_IF_UNDOCUMENTED   = YES
 JAVADOC_AUTOBRIEF      = YES
-WARN_IF_UNDOCUMENTED   = NO
-INPUT                  = @PROJECT_SOURCE_DIR@/engine
-FILE_PATTERNS          = *.hpp
+
+# README.md becomes the landing page, so the site opens on what the engine is
+# rather than on an alphabetical file list.
+INPUT                  = @PROJECT_SOURCE_DIR@/engine @PROJECT_SOURCE_DIR@/README.md
+USE_MDFILE_AS_MAINPAGE = @PROJECT_SOURCE_DIR@/README.md
+FILE_PATTERNS          = *.hpp *.md
+
+# The GL loader is a wall of function-pointer typedefs mirroring the GL ABI;
+# it documents nothing a caller of the RHI needs.
+EXCLUDE                = @PROJECT_SOURCE_DIR@/engine/rhi/gl/GLLoader.hpp
+
 FULL_PATH_NAMES        = NO
 STRIP_FROM_PATH        = @PROJECT_SOURCE_DIR@
+
+# Declaration order groups related calls together; alphabetical would scatter
+# begin/draw/end across the page.
+SORT_MEMBER_DOCS       = NO
+SORT_BRIEF_DOCS        = NO
+
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+SHOW_USED_FILES        = NO
+
+# Class hierarchies only when graphviz is available. Call graphs are left off:
+# they are slow to render and enormous for anything that touches the batcher.
+HAVE_DOT               = @VAXELIS_DOXYGEN_HAVE_DOT@
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = NO
+INCLUDE_GRAPH          = NO
+INCLUDED_BY_GRAPH      = NO
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+DOT_IMAGE_FORMAT       = svg
