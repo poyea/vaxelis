@@ -57,8 +57,7 @@ class Signature {
 };
 
 /// The signature naming exactly `Ts`, registering any id not yet assigned.
-template <class... Ts>
-Signature signature_of() {
+template <class... Ts> Signature signature_of() {
     Signature s;
     (s.set(component_id<Ts>()), ...);
     return s;
@@ -67,8 +66,7 @@ Signature signature_of() {
 } // namespace vaxelis::ecs
 
 /// Lets a signature key an unordered_map of archetypes.
-template <>
-struct std::hash<vaxelis::ecs::Signature> {
+template <> struct std::hash<vaxelis::ecs::Signature> {
     std::size_t operator()(const vaxelis::ecs::Signature& s) const noexcept {
         return std::hash<uint64_t>{}(s.bits());
     }

@@ -45,8 +45,7 @@ struct ComponentInfo {
 namespace detail {
 
 /// The three operations above, generated once per component type.
-template <class T>
-struct ComponentOps {
+template <class T> struct ComponentOps {
     static void default_construct(std::byte* at) { std::construct_at(reinterpret_cast<T*>(at)); }
 
     static void move_construct(std::byte* to, std::byte* from) {
@@ -70,8 +69,7 @@ const ComponentInfo& component_info(ComponentId id);
 uint32_t registered_component_count();
 
 /// The id for `T`, assigning one on first use.
-template <class T>
-ComponentId component_id() {
+template <class T> ComponentId component_id() {
     static_assert(std::is_default_constructible_v<T>,
                   "components must be default-constructible: a fresh row default-fills");
     static_assert(std::is_nothrow_move_constructible_v<T>,

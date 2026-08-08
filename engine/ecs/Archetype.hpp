@@ -70,17 +70,13 @@ class Archetype {
 
     /// Typed view over one column, covering the live rows. Empty when `T` is
     /// not stored here.
-    template <class T>
-    std::span<T> column() {
+    template <class T> std::span<T> column() {
         std::byte* base = column_bytes(component_id<T>());
         return base ? std::span<T>(reinterpret_cast<T*>(base), m_rows) : std::span<T>{};
     }
 
     /// One component of one row. The row must exist and hold `T`.
-    template <class T>
-    T& get(size_t row) {
-        return column<T>()[row];
-    }
+    template <class T> T& get(size_t row) { return column<T>()[row]; }
 
     /// Component ids stored here, in registration order.
     std::span<const ComponentId> component_ids() const { return m_ids; }
