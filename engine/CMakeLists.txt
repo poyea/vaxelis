@@ -8,6 +8,7 @@ add_library(vaxelis_engine STATIC
     core/Application.cpp
     ecs/ComponentType.cpp
     ecs/Archetype.cpp
+    ecs/World.cpp
     input/Input.cpp
     physics/Physics2D.cpp
     rhi/Rhi.cpp
