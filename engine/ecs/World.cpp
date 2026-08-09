@@ -119,13 +119,17 @@ void World::destroy(Entity e) {
     rec.table = nullptr;
     rec.row = 0;
     rec.alive = false;
-    // Outstanding handles now fail the generation check. Wrapping would take
-    // four billion reuses of one slot.
+
+    // Outstanding handles now fail the generation check. On the four-billionth
+    // reuse the counter wraps back to the generation this slot started on,
+    // which would revive its very first handles, so retire the slot instead of
+    // recycling it. Leaking one index is cheaper than resurrecting an entity.
     ++rec.generation;
     if (rec.generation == 0)
         rec.generation = 1;
+    else
+        m_free.push_back(e.index);
 
-    m_free.push_back(e.index);
     --m_live;
 }
 
