@@ -75,6 +75,12 @@ class World {
             return nullptr;
         }
         const ComponentId id = component_id<T>();
+        if (id == kInvalidComponent) {
+            // Registration failed, so no archetype can ever hold this type and
+            // migrating would land the row in a column that does not exist.
+            report_stale("add");
+            return nullptr;
+        }
         if (!rec->table->archetype.has(id)) {
             Signature target = rec->table->archetype.signature();
             target.set(id);

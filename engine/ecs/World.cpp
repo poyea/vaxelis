@@ -39,6 +39,10 @@ void World::seat(Entity e, Table& table) {
 }
 
 void World::unseat(Table& table, size_t row) {
+    // Bail before touching `entities`: popping it while the archetype refused
+    // the removal would desync the two permanently.
+    if (row >= table.archetype.size())
+        return;
     const size_t vacated = table.archetype.remove_row(row);
     if (vacated != row) {
         // remove_row moved the last row into the gap, so the entity that owned

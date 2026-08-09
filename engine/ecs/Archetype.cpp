@@ -1,5 +1,7 @@
 #include "engine/ecs/Archetype.hpp"
 
+#include <cassert>
+
 namespace vaxelis::ecs {
 
 namespace {
@@ -109,6 +111,10 @@ size_t Archetype::add_row() {
 }
 
 size_t Archetype::remove_row(size_t row) {
+    // Returning `row` here would be indistinguishable from the legitimate
+    // "the row was already last" result, and World::unseat would pop an
+    // entity that is still seated.
+    assert(row < m_rows && "Archetype::remove_row out of range");
     if (row >= m_rows)
         return row;
 
@@ -128,6 +134,9 @@ size_t Archetype::remove_row(size_t row) {
 }
 
 size_t Archetype::move_row_from(Archetype& src, size_t src_row) {
+    // Falling back to a default row would look like success and silently lose
+    // the caller's data, so this is a precondition rather than a recovery.
+    assert(src_row < src.m_rows && "Archetype::move_row_from out of range");
     if (src_row >= src.m_rows)
         return add_row();
 

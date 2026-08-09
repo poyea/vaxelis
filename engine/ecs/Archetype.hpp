@@ -3,6 +3,7 @@
 /// @file
 /// Column-major storage for the entities sharing one component signature.
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <span>
@@ -76,7 +77,11 @@ class Archetype {
     }
 
     /// One component of one row. The row must exist and hold `T`.
-    template <class T> T& get(size_t row) { return column<T>()[row]; }
+    template <class T> T& get(size_t row) {
+        const std::span<T> col = column<T>();
+        assert(row < col.size() && "Archetype::get on a missing column or row");
+        return col[row];
+    }
 
     /// Component ids stored here, in registration order.
     std::span<const ComponentId> component_ids() const { return m_ids; }
