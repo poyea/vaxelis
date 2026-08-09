@@ -113,6 +113,14 @@ class World {
         return &rec->table->archetype.get<T>(rec->row);
     }
 
+    /// Read-only pointer to `e`'s `T`, or nullptr. See try_get().
+    template <class T> const T* try_get(Entity e) const {
+        const Record* rec = find(e);
+        if (rec == nullptr || !rec->table->archetype.has(component_id<T>()))
+            return nullptr;
+        return &rec->table->archetype.get<T>(rec->row);
+    }
+
     /// Calls `fn(Ts&...)` for every entity carrying all of `Ts`.
     ///
     /// This is what the column layout is for: each matching archetype hands
@@ -124,33 +132,22 @@ class World {
     /// reshapes the very storage being walked. Collect the entities to change
     /// and apply afterwards.
     template <class... Ts, class Fn> void each(Fn&& fn) {
-        const Signature query = signature_of<Ts...>();
-        for (auto& [sig, table] : m_tables) {
-            if (!sig.contains(query))
-                continue;
-            const size_t rows = table->archetype.size();
-            if (rows == 0)
-                continue;
-            // One column lookup per archetype, not per row.
-            auto columns = std::tuple<std::span<Ts>...>{table->archetype.column<Ts>()...};
-            for (size_t row = 0; row < rows; ++row)
-                fn(std::get<std::span<Ts>>(columns)[row]...);
-        }
+        visit_matching<Ts...>(*this, [&fn](Entity, auto&... cols) { fn(cols...); });
+    }
+
+    /// Read-only each(); the callback receives `const Ts&`.
+    template <class... Ts, class Fn> void each(Fn&& fn) const {
+        visit_matching<Ts...>(*this, [&fn](Entity, auto&... cols) { fn(cols...); });
     }
 
     /// As each(), but the callback also receives the entity: `fn(Entity, Ts&...)`.
     template <class... Ts, class Fn> void each_entity(Fn&& fn) {
-        const Signature query = signature_of<Ts...>();
-        for (auto& [sig, table] : m_tables) {
-            if (!sig.contains(query))
-                continue;
-            const size_t rows = table->archetype.size();
-            if (rows == 0)
-                continue;
-            auto columns = std::tuple<std::span<Ts>...>{table->archetype.column<Ts>()...};
-            for (size_t row = 0; row < rows; ++row)
-                fn(table->entities[row], std::get<std::span<Ts>>(columns)[row]...);
-        }
+        visit_matching<Ts...>(*this, std::forward<Fn>(fn));
+    }
+
+    /// Read-only each_entity(); the callback receives `const Ts&`.
+    template <class... Ts, class Fn> void each_entity(Fn&& fn) const {
+        visit_matching<Ts...>(*this, std::forward<Fn>(fn));
     }
 
   private:
@@ -193,6 +190,28 @@ class World {
     /// Logs use of a stale handle. Out of line so this header does not drag the
     /// logger into everything that includes it.
     static void report_stale(const char* op);
+
+    /// The one query walk behind each() and each_entity(). Deducing `Self` lets
+    /// the same body serve `World&` and `const World&` -- the archetype's own
+    /// const overloads then decide whether the columns come back mutable. `fn`
+    /// always takes the entity first; the wrappers that do not want it drop it.
+    template <class... Ts, class Self, class Fn> static void visit_matching(Self& self, Fn&& fn) {
+        const Signature query = signature_of<Ts...>();
+        for (auto& [sig, table] : self.m_tables) {
+            if (!sig.contains(query))
+                continue;
+            auto& arch = table->archetype;
+            const size_t rows = arch.size();
+            if (rows == 0)
+                continue;
+            // One column lookup per archetype, not per row.
+            auto columns = std::tuple{arch.template column<Ts>()...};
+            for (size_t row = 0; row < rows; ++row) {
+                const Entity owner = table->entities[row];
+                std::apply([&](auto&... cols) { fn(owner, cols[row]...); }, columns);
+            }
+        }
+    }
 
     std::unordered_map<Signature, std::unique_ptr<Table>> m_tables;
     std::vector<Record> m_records;

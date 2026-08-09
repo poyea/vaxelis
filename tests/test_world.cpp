@@ -269,3 +269,41 @@ TEST(World, EachSkipsEmptiedArchetypes) {
     EXPECT_EQ(visits, 0);
     EXPECT_EQ(w.archetype_count(), 2u);
 }
+
+TEST(World, QualifiedComponentTypesNameTheSameComponent) {
+    World w;
+    const Entity e = w.create();
+    w.add<Pos>(e, Pos{5.0f, 0.0f});
+
+    // const Pos must resolve to the same id as Pos, or the query mask holds a
+    // bit no archetype carries and the loop silently visits nothing.
+    EXPECT_EQ(component_id<Pos>(), component_id<const Pos>());
+    EXPECT_EQ(component_id<Pos>(), component_id<Pos&>());
+    EXPECT_TRUE(w.has<const Pos>(e));
+
+    int visits = 0;
+    w.each<const Pos>([&](const Pos& p) {
+        ++visits;
+        EXPECT_FLOAT_EQ(p.x, 5.0f);
+    });
+    EXPECT_EQ(visits, 1);
+}
+
+TEST(World, ConstWorldSupportsReadOnlyQueries) {
+    World w;
+    const Entity e = w.create();
+    w.add<Pos>(e, Pos{2.0f, 3.0f});
+
+    const World& ro = w;
+    ASSERT_NE(ro.try_get<Pos>(e), nullptr);
+    EXPECT_FLOAT_EQ(ro.try_get<Pos>(e)->y, 3.0f);
+
+    int visits = 0;
+    ro.each<Pos>([&](const Pos& p) {
+        ++visits;
+        EXPECT_FLOAT_EQ(p.x, 2.0f);
+    });
+    EXPECT_EQ(visits, 1);
+
+    ro.each_entity<Pos>([&](Entity owner, const Pos&) { EXPECT_TRUE(ro.alive(owner)); });
+}

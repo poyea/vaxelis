@@ -76,9 +76,23 @@ class Archetype {
         return base ? std::span<T>(reinterpret_cast<T*>(base), m_rows) : std::span<T>{};
     }
 
+    /// Read-only view over one column. See column().
+    template <class T> std::span<const T> column() const {
+        const std::byte* base = column_bytes(component_id<T>());
+        return base ? std::span<const T>(reinterpret_cast<const T*>(base), m_rows)
+                    : std::span<const T>{};
+    }
+
     /// One component of one row. The row must exist and hold `T`.
     template <class T> T& get(size_t row) {
         const std::span<T> col = column<T>();
+        assert(row < col.size() && "Archetype::get on a missing column or row");
+        return col[row];
+    }
+
+    /// Read-only access to one component of one row. See get().
+    template <class T> const T& get(size_t row) const {
+        const std::span<const T> col = column<T>();
         assert(row < col.size() && "Archetype::get on a missing column or row");
         return col[row];
     }
