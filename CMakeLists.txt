@@ -16,6 +16,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(VAXELIS_BUILD_RUNTIME "Build the runtime executable" ON)
 option(VAXELIS_BUILD_EXAMPLES "Build the example programs" ON)
+option(VAXELIS_BUILD_BENCHMARKS "Build the headless benchmarks" ON)
 option(VAXELIS_BUILD_TESTS "Build unit tests" ${BUILD_TESTING})
 option(VAXELIS_ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
 option(VAXELIS_BUILD_DOCS "Build API documentation with Doxygen" OFF)
@@ -26,6 +27,7 @@ option(VAXELIS_BUILD_DOCS "Build API documentation with Doxygen" OFF)
 if(EMSCRIPTEN)
     set(VAXELIS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(VAXELIS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(VAXELIS_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14)
@@ -53,6 +55,10 @@ endif()
 
 if(VAXELIS_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(VAXELIS_BUILD_BENCHMARKS)
+    add_subdirectory(benchmarks)
 endif()
 
 if(VAXELIS_BUILD_TESTS)

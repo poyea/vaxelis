@@ -1,0 +1,52 @@
+name: bench
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ecs-bench:
+    # Informational only. A shared runner's timings are far too noisy to gate a
+    # merge on, so this job never fails the commit it reports about.
+    continue-on-error: true
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install toolchain + SDL deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build g++-14 pkg-config \
+            libasound2-dev libpulse-dev libjack-dev libsndio-dev \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev \
+            libxi-dev libxss-dev libxkbcommon-dev libdrm-dev libgbm-dev \
+            libgl-dev libgles2-mesa-dev libegl1-mesa-dev \
+            libdbus-1-dev libudev-dev libwayland-dev libdecor-0-dev
+      - name: Configure
+        env:
+          CC: gcc-14
+          CXX: g++-14
+        # Release matters: the default configure is unoptimised, which would
+        # measure the debug allocator more than the storage layout.
+        run: >
+          cmake -S . -B build/bench -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DVAXELIS_BUILD_TESTS=OFF
+          -DVAXELIS_BUILD_RUNTIME=OFF
+          -DVAXELIS_BUILD_EXAMPLES=OFF
+          -DVAXELIS_BUILD_BENCHMARKS=ON
+      - name: Build
+        run: cmake --build build/bench --target vaxelis_ecs_bench
+      - name: Run
+        run: |
+          {
+            echo "## ECS benchmark"
+            echo ""
+            echo "Archetype world vs entt sparse sets, same work on both."
+            echo "Ratio below 1.00 means the archetype path was faster."
+            echo ""
+            ./build/bench/benchmarks/vaxelis_ecs_bench
+          } | tee -a "$GITHUB_STEP_SUMMARY"
