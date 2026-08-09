@@ -33,9 +33,12 @@ namespace vaxelis::ecs {
 /// or reshuffle a column. Fetch them again after add(), remove() or destroy().
 class World {
   public:
+    /// Creates a world holding nothing but the empty archetype.
     World();
+    /// Destroys every entity and archetype, running component destructors.
     ~World();
 
+    /// Not copyable: entity records point straight at the archetypes.
     World(const World&) = delete;
     World& operator=(const World&) = delete;
 

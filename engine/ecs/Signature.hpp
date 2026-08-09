@@ -17,7 +17,9 @@ namespace vaxelis::ecs {
 /// archetype must contain, so both tests are single integer operations.
 class Signature {
   public:
+    /// An empty set: contained by every archetype, so it matches all of them.
     constexpr Signature() = default;
+    /// Wraps a raw bit pattern, for round-tripping through bits().
     constexpr explicit Signature(uint64_t bits) : m_bits(bits) {}
 
     /// Adds `id`. Ids at or past kMaxComponents are ignored rather than
@@ -27,11 +29,13 @@ class Signature {
         return *this;
     }
 
+    /// Drops `id`. Ignores ids outside the representable range, as set() does.
     constexpr Signature& reset(ComponentId id) {
         m_bits &= ~bit(id);
         return *this;
     }
 
+    /// True when `id` is in the set.
     constexpr bool test(ComponentId id) const { return (m_bits & bit(id)) != 0; }
 
     /// True when every component in `subset` is also here. This is the test a
@@ -43,9 +47,12 @@ class Signature {
     /// Number of component types in the set.
     constexpr uint32_t count() const { return static_cast<uint32_t>(std::popcount(m_bits)); }
 
+    /// True when no component is set.
     constexpr bool empty() const { return m_bits == 0; }
+    /// The raw mask, for hashing and for round-tripping through the ctor.
     constexpr uint64_t bits() const { return m_bits; }
 
+    /// Two signatures are equal when they name the same component set.
     constexpr bool operator==(const Signature&) const = default;
 
   private:

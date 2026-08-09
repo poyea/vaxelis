@@ -32,14 +32,18 @@ class Archetype {
     /// Builds empty columns for `ids`; duplicates are ignored. The signature is
     /// derived from the ids given.
     explicit Archetype(std::span<const ComponentId> ids);
+    /// Destroys every live row, then releases the columns.
     ~Archetype();
 
+    /// Not copyable: the columns are raw allocations this object owns.
     Archetype(const Archetype&) = delete;
     Archetype& operator=(const Archetype&) = delete;
 
+    /// The component set every row here carries.
     Signature signature() const { return m_signature; }
     /// Number of live rows.
     size_t size() const { return m_rows; }
+    /// True when no rows are stored.
     bool empty() const { return m_rows == 0; }
     /// Rows that fit before the next reallocation.
     size_t capacity() const { return m_capacity; }

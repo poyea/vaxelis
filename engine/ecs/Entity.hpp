@@ -15,10 +15,12 @@ namespace vaxelis::ecs {
 /// makes every handle still pointing at the old entity compare unequal and read
 /// as dead instead of quietly addressing a stranger.
 struct Entity {
+    /// Slot this entity occupies in the world's record table.
     uint32_t index{0};
     /// Zero is never handed out, so a default-constructed handle is never alive.
     uint32_t generation{0};
 
+    /// Handles match only when they name the same incarnation of a slot.
     constexpr bool operator==(const Entity&) const = default;
 };
 
