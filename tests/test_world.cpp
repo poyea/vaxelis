@@ -332,8 +332,9 @@ TEST(World, MigrationsDestroyExactlyWhatTheyCreate) {
         World w;
         const Entity e = w.create();
 
-        w.add<Counted>(e, Counted{1});     // {} -> {Counted}
-        w.add<Pos>(e, Pos{1.0f, 0.0f});    // {Counted} -> {Counted, Pos}
+        // {} -> {Counted} -> {Counted, Pos}
+        w.add<Counted>(e, Counted{1});
+        w.add<Pos>(e, Pos{1.0f, 0.0f});
         EXPECT_EQ(Counted::alive, 1);
 
         w.remove<Pos>(e); // migrate back; Counted rides along, still one copy
