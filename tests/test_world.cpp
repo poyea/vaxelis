@@ -307,3 +307,102 @@ TEST(World, ConstWorldSupportsReadOnlyQueries) {
 
     ro.each_entity<Pos>([&](Entity owner, const Pos&) { EXPECT_TRUE(ro.alive(owner)); });
 }
+
+namespace {
+
+/// Counts live instances so a leak or double-destroy in the migration paths
+/// shows up as a non-zero balance.
+struct Counted {
+    static inline int alive = 0;
+    int value{0};
+
+    Counted() { ++alive; }
+    Counted(const Counted& other) : value(other.value) { ++alive; }
+    Counted(Counted&& other) noexcept : value(other.value) { ++alive; }
+    Counted& operator=(const Counted&) = default;
+    Counted& operator=(Counted&&) noexcept = default;
+    ~Counted() { --alive; }
+};
+
+} // namespace
+
+TEST(World, MigrationsDestroyExactlyWhatTheyCreate) {
+    Counted::alive = 0;
+    {
+        World w;
+        const Entity e = w.create();
+
+        w.add<Counted>(e, Counted{1});     // {} -> {Counted}
+        w.add<Pos>(e, Pos{1.0f, 0.0f});    // {Counted} -> {Counted, Pos}
+        EXPECT_EQ(Counted::alive, 1);
+
+        w.remove<Pos>(e); // migrate back; Counted rides along, still one copy
+        EXPECT_EQ(Counted::alive, 1);
+        EXPECT_EQ(w.try_get<Counted>(e)->value, 1);
+
+        w.remove<Counted>(e); // dropped entirely
+        EXPECT_EQ(Counted::alive, 0);
+        EXPECT_FALSE(w.has<Counted>(e));
+    }
+    EXPECT_EQ(Counted::alive, 0);
+}
+
+TEST(World, DestroyingAnEntityRunsItsComponentDestructors) {
+    Counted::alive = 0;
+    {
+        World w;
+        std::vector<Entity> entities;
+        for (int i = 0; i < 12; ++i) {
+            entities.push_back(w.create());
+            w.add<Counted>(entities.back(), Counted{i});
+        }
+        EXPECT_EQ(Counted::alive, 12);
+
+        w.destroy(entities[5]); // swap-and-pop from the middle
+        EXPECT_EQ(Counted::alive, 11);
+        w.destroy(entities.back()); // and from the end
+        EXPECT_EQ(Counted::alive, 10);
+    }
+    EXPECT_EQ(Counted::alive, 0); // the World destructor takes the rest
+}
+
+TEST(World, MigrationSurvivesColumnGrowth) {
+    Counted::alive = 0;
+    {
+        World w;
+        std::vector<Entity> entities;
+        // Past the initial capacity of 8, so {Counted} reallocates its column
+        // and any stale pointer held across the growth would show up here.
+        for (int i = 0; i < 40; ++i) {
+            entities.push_back(w.create());
+            w.add<Counted>(entities.back(), Counted{i});
+        }
+        EXPECT_EQ(Counted::alive, 40);
+
+        // Migrate the last row, exercising unseat's "nothing moved" branch.
+        w.add<Pos>(entities.back(), Pos{9.0f, 0.0f});
+        // And one from the middle, exercising the swap.
+        w.add<Pos>(entities[10], Pos{10.0f, 0.0f});
+        EXPECT_EQ(Counted::alive, 40);
+
+        for (int i = 0; i < 40; ++i) {
+            const Counted* c = w.try_get<Counted>(entities[static_cast<size_t>(i)]);
+            ASSERT_NE(c, nullptr) << "entity " << i;
+            EXPECT_EQ(c->value, i) << "entity " << i;
+        }
+    }
+    EXPECT_EQ(Counted::alive, 0);
+}
+
+TEST(World, RemovingTheLastComponentReturnsToTheEmptyArchetype) {
+    World w;
+    const Entity e = w.create();
+    w.add<Pos>(e, Pos{1.0f, 0.0f});
+    const size_t shapes = w.archetype_count();
+
+    w.remove<Pos>(e);
+    EXPECT_FALSE(w.has<Pos>(e));
+    EXPECT_TRUE(w.alive(e));
+    // Back in the archetype it started in; no duplicate empty table minted.
+    EXPECT_EQ(w.archetype_count(), shapes);
+}
