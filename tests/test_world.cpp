@@ -317,6 +317,9 @@ struct Counted {
     int value{0};
 
     Counted() { ++alive; }
+    /// User-declared constructors make this a non-aggregate, so the value
+    /// constructor has to be spelled out for `Counted{n}` to compile.
+    explicit Counted(int v) : value(v) { ++alive; }
     Counted(const Counted& other) : value(other.value) { ++alive; }
     Counted(Counted&& other) noexcept : value(other.value) { ++alive; }
     Counted& operator=(const Counted&) = default;
