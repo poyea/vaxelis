@@ -8,10 +8,17 @@
 ///              Hierarchy::children with random component access per node
 ///   render     Scene::render_sprites(), which gathers, sorts by (z, texture)
 ///              and submits
+///   archetype  the same work as `animate`, over ecs::World columns instead
 ///
-/// The point is the ratio between the first two: same entities, same count,
-/// one walked linearly and one walked as a tree. Drag the sliders until the
-/// numbers separate and the cost of the scene graph stops being theoretical.
+/// Two ratios come out of that. `dfs/flat` is the cost of the scene graph:
+/// same entities, same count, one walked linearly and one walked as a tree.
+/// `arch/flat` is archetype columns against entt's sparse set on identical
+/// work, which is the number that says whether migrating storage is worth
+/// anything. Drag the sliders until they separate.
+///
+/// The archetype world mirrors only the entity count and Transform2D -- it has
+/// no hierarchy and no sprites -- so `arch/flat` compares storage layout, not
+/// engines. Read it as an upper bound on what migrating could buy.
 ///
 /// Note render_sprites() refreshes world transforms itself, so its number
 /// includes a second transform pass; subtract `transform` to read the
@@ -22,6 +29,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <memory>
 #include <numeric>
 #include <string>
 #include <vector>
@@ -33,6 +41,7 @@
 #include "engine/assets/AssetCache.hpp"
 #include "engine/core/Application.hpp"
 #include "engine/core/Log.hpp"
+#include "engine/ecs/World.hpp"
 #include "engine/renderer/SpriteRenderer.hpp"
 #include "engine/scene/Camera2D.hpp"
 #include "engine/scene/Components.hpp"
@@ -102,18 +111,25 @@ class Stress final : public vaxelis::Application {
         if (input().pressed("rebuild"))
             rebuild();
 
-        // Phase 1: flat sweep. A single-component view iterates the storage's
-        // packed array directly, so this is the ECS at its best.
+        // Phase 1: flat sweep over the sparse set. view::each is entt's fast
+        // path -- iterating the view and calling get() per entity would add a
+        // sparse->dense lookup each step and quietly slander it.
         const auto t_anim = SteadyClock::now();
-        auto spin = m_scene.registry().view<vaxelis::Transform2D>();
-        for (auto e : spin)
-            spin.get<vaxelis::Transform2D>(e).rotation += dt;
+        m_scene.registry().view<vaxelis::Transform2D>().each(
+            [dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
         m_anim.push(ms_since(t_anim));
 
         // Phase 2: the same entities, reached through the tree instead.
         const auto t_tree = SteadyClock::now();
         m_scene.update_world_transforms();
         m_transform.push(ms_since(t_tree));
+
+        // Phase 3: identical work over archetype columns. Same component type
+        // and same entity count as phase 1, so the difference is the storage
+        // layout and nothing else.
+        const auto t_arch = SteadyClock::now();
+        m_ecs->each<vaxelis::Transform2D>([dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
+        m_archetype.push(ms_since(t_arch));
     }
 
     void on_render() override {
@@ -138,7 +154,8 @@ class Stress final : public vaxelis::Application {
 
         ImGui::Separator();
         ImGui::Text("nodes      %d over %d levels", m_nodes, m_depth);
-        ImGui::Text("build      %.1f ms (one off)", static_cast<double>(m_build_ms));
+        ImGui::Text("build      %.1f ms scene / %.1f ms ecs (one off)",
+                    static_cast<double>(m_build_ms), static_cast<double>(m_ecs_build_ms));
         ImGui::Separator();
         ImGui::Text("animate    %.3f ms   flat view<Transform2D>",
                     static_cast<double>(m_anim.mean()));
@@ -146,8 +163,13 @@ class Stress final : public vaxelis::Application {
                     static_cast<double>(m_transform.mean()));
         ImGui::Text("render     %.3f ms   gather + sort + submit",
                     static_cast<double>(m_render.mean()));
-        ImGui::Text("ratio      %.1fx     DFS vs flat sweep",
-                    static_cast<double>(ratio()));
+        ImGui::Text("archetype  %.3f ms   ecs::World each<Transform2D>",
+                    static_cast<double>(m_archetype.mean()));
+        ImGui::Separator();
+        ImGui::Text("dfs/flat   %.2fx     scene graph vs sparse-set sweep",
+                    static_cast<double>(ratio(m_transform, m_anim)));
+        ImGui::Text("arch/flat  %.2fx     archetype vs sparse set (<1 wins)",
+                    static_cast<double>(ratio(m_archetype, m_anim)));
         ImGui::Separator();
         ImGui::Text("quads      %u in %u draw calls", m_batch.quads(), m_batch.draw_calls());
         ImGui::Text("FPS        %.1f", static_cast<double>(ImGui::GetIO().Framerate));
@@ -161,9 +183,10 @@ class Stress final : public vaxelis::Application {
     }
 
   private:
-    float ratio() const {
-        const float flat = m_anim.mean();
-        return flat > 0.0f ? m_transform.mean() / flat : 0.0f;
+    /// `lhs` relative to `rhs`; 0 until the rolling window has data.
+    static float ratio(const Rolling& lhs, const Rolling& rhs) {
+        const float base = rhs.mean();
+        return base > 0.0f ? lhs.mean() / base : 0.0f;
     }
 
     /// Rebuilds the scene as a tree `depth` levels deep, spreading the node
@@ -217,6 +240,14 @@ class Stress final : public vaxelis::Application {
         }
 
         m_build_ms = ms_since(t0);
+
+        // Mirror the node count into an archetype world. One add() per entity
+        // means one migration each, empty archetype -> {Transform2D}.
+        const auto t_ecs = SteadyClock::now();
+        m_ecs = std::make_unique<vaxelis::ecs::World>();
+        for (int i = 0; i < m_nodes; ++i)
+            m_ecs->add<vaxelis::Transform2D>(m_ecs->create());
+        m_ecs_build_ms = ms_since(t_ecs);
         m_camera.position = {0.0f, 0.0f};
         m_camera.zoom = 640.0f / (span * spacing + 1.0f);
         m_camera.zoom = std::clamp(m_camera.zoom, 0.05f, 4.0f);
@@ -229,10 +260,17 @@ class Stress final : public vaxelis::Application {
     vaxelis::Camera2D m_camera;
     vaxelis::rhi::TextureHandle m_texture{};
 
+    /// Same entity count as the scene, holding Transform2D only, so phase 3
+    /// measures column iteration rather than scene-graph bookkeeping. Held by
+    /// pointer because ecs::World is neither copyable nor movable.
+    std::unique_ptr<vaxelis::ecs::World> m_ecs;
+
     Rolling m_anim;
     Rolling m_transform;
     Rolling m_render;
+    Rolling m_archetype;
     float m_build_ms{0.0f};
+    float m_ecs_build_ms{0.0f};
 
     int m_wanted_nodes{2000};
     int m_wanted_depth{4};
