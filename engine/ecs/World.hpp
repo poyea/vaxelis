@@ -9,6 +9,7 @@
 #include <memory>
 #include <span>
 #include <tuple>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -69,6 +70,12 @@ class World {
     /// than migrating. Returns nullptr for a stale handle, which is logged: a
     /// caller that knows the entity is alive can dereference without checking.
     template <class T> T* add(Entity e, T value = T{}) {
+        // The overwrite path below assigns over a default-constructed slot, a
+        // stronger requirement than registration checks. Say so here rather
+        // than letting the failure surface as "no viable operator=".
+        static_assert(std::is_move_assignable_v<T>,
+                      "World::add overwrites the component in place, so it must be "
+                      "move-assignable as well as movable");
         Record* rec = find(e);
         if (rec == nullptr) {
             report_stale("add");
