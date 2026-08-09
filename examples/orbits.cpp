@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 /// @file
 /// N-body orbits: a heavy star and a swarm of planets under mutual gravity,
 /// integrated at a fixed timestep and drawn through the scene tree.

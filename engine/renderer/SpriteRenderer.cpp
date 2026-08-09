@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 #include "engine/renderer/SpriteRenderer.hpp"
 
 #include <cassert>

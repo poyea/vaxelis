@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 /// @file
 /// Headless ECS benchmark: the same workloads over entt's sparse sets and over
 /// the archetype world, with no window, device or audio, so CI can run it.

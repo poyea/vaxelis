@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 /// @file
 /// Scene stress harness: builds a scene of a chosen size and hierarchy depth,
 /// then times the three passes a frame actually spends its budget on.

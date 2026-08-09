@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 #pragma once
 
 // Minimal GL 4.5 core loader. Declares only the entry points used by the

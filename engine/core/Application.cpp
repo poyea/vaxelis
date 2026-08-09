@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 #include "engine/core/Application.hpp"
 
 #include <SDL3/SDL.h>

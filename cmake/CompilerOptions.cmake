@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 John Law
+
 include(CheckIPOSupported)
 
 function(vaxelis_apply_target_options target_name)

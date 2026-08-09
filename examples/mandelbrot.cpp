@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 /// @file
 /// Mandelbrot explorer: an escape-time fractal rasterized on the CPU into one
 /// RGBA8 texture, stretched over the window as a single quad.

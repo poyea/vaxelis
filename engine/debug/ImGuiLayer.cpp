@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 #include "engine/debug/ImGuiLayer.hpp"
 
 #include <backends/imgui_impl_opengl3.h>

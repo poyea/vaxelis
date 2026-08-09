@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 /// @file
 /// Harmonograph: the curve traced by four damped pendulums, two per axis.
 ///

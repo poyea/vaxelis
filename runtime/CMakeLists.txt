@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 John Law
+
 add_executable(vaxelis_runtime main.cpp)
 target_link_libraries(vaxelis_runtime PRIVATE vaxelis_engine)
 vaxelis_apply_target_options(vaxelis_runtime)

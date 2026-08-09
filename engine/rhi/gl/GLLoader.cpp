@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 John Law
+
 #include "engine/rhi/gl/GLLoader.hpp"
 
 #include <SDL3/SDL_video.h>

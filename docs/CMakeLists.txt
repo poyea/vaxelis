@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 John Law
+
 find_package(Doxygen REQUIRED)
 
 # Graphviz is optional. When it is present Doxygen draws the class hierarchies;

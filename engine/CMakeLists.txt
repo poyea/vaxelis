@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 John Law
+
 add_library(vaxelis_engine STATIC
     assets/AssetCache.cpp
     assets/FileWatcher.cpp

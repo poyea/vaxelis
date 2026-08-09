@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 John Law
+
 # One executable per example. Each example is a single self-contained file that
 # depends on nothing but the engine -- no assets, no shared helper headers -- so
 # it reads top to bottom as a complete program.
