@@ -10,9 +10,18 @@ namespace {
 
 /// Function-local so the table is initialised on first use, whichever
 /// translation unit registers a component first.
+///
+/// Deliberately never freed: an Archetype with static storage would otherwise
+/// out-live it and read a destroyed vector while destroying its rows.
 std::vector<ComponentInfo>& table() {
-    static std::vector<ComponentInfo> entries;
-    return entries;
+    // Reserved to the cap so a later registration never reallocates: callers
+    // hold `const ComponentInfo&` across user code that may itself register.
+    static std::vector<ComponentInfo>* entries = [] {
+        auto* v = new std::vector<ComponentInfo>();
+        v->reserve(kMaxComponents);
+        return v;
+    }();
+    return *entries;
 }
 
 const ComponentInfo& null_info() {
@@ -28,10 +37,13 @@ ComponentId register_component(ComponentInfo info) {
     auto& entries = table();
     const auto id = static_cast<ComponentId>(entries.size());
     if (id >= kMaxComponents) {
-        // Signature is one 64-bit word; going past it would silently drop bits.
-        VX_ERROR("ecs: component limit of {} reached, '{}' will not be usable", kMaxComponents,
+        // Signature is one 64-bit word, so there is no bit left to represent
+        // this type. Returning an in-range id would let it flow into a mask
+        // that silently drops it; kInvalidComponent is rejected at every entry
+        // point instead.
+        VX_ERROR("ecs: component limit of {} reached, '{}' cannot be registered", kMaxComponents,
                  info.name);
-        return kMaxComponents;
+        return kInvalidComponent;
     }
     info.id = id;
     entries.push_back(info);
