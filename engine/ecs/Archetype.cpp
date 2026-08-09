@@ -102,10 +102,7 @@ size_t Archetype::add_row() {
         reserve(m_capacity == 0 ? kInitialCapacity : m_capacity * 2);
 
     const size_t row = m_rows;
-    for (Column& col : m_columns) {
-        const ComponentInfo& info = component_info(col.id);
-        info.default_construct(element_at(col.data, col.stride, row));
-    }
+    build_row(row, nullptr, 0);
     ++m_rows;
     return row;
 }
@@ -144,19 +141,38 @@ size_t Archetype::move_row_from(Archetype& src, size_t src_row) {
         reserve(m_capacity == 0 ? kInitialCapacity : m_capacity * 2);
 
     const size_t row = m_rows;
-    for (Column& col : m_columns) {
-        const ComponentInfo& info = component_info(col.id);
-        std::byte* to = element_at(col.data, col.stride, row);
-        // Shared components carry their value across the structural change;
-        // anything only this archetype has starts out default-constructed.
-        if (Column* from_col = src.find(col.id)) {
-            info.move_construct(to, element_at(from_col->data, from_col->stride, src_row));
-        } else {
-            info.default_construct(to);
-        }
-    }
+    build_row(row, &src, src_row);
     ++m_rows;
     return row;
+}
+
+void Archetype::build_row(size_t row, Archetype* src, size_t src_row) {
+    // m_rows is not bumped until the row is whole, so a throwing default
+    // constructor would leave the columns already built holding live objects
+    // that nothing ever destroys -- ~Archetype only walks rows below m_rows.
+    // Unwind them by hand and let the exception through.
+    size_t built = 0;
+    try {
+        for (Column& col : m_columns) {
+            const ComponentInfo& info = component_info(col.id);
+            std::byte* to = element_at(col.data, col.stride, row);
+            // Shared components carry their value across a structural change;
+            // anything only this archetype has starts out default-constructed.
+            Column* from_col = src != nullptr ? src->find(col.id) : nullptr;
+            if (from_col != nullptr) {
+                info.move_construct(to, element_at(from_col->data, from_col->stride, src_row));
+            } else {
+                info.default_construct(to);
+            }
+            ++built;
+        }
+    } catch (...) {
+        for (size_t i = 0; i < built; ++i) {
+            const Column& done = m_columns[i];
+            component_info(done.id).destroy(element_at(done.data, done.stride, row));
+        }
+        throw;
+    }
 }
 
 } // namespace vaxelis::ecs

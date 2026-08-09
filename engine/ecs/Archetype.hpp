@@ -99,6 +99,12 @@ class Archetype {
     const Column* find(ComponentId id) const;
     void destroy_row(size_t row);
 
+    /// Fills every column of `row`, moving from `src`'s `src_row` where the two
+    /// share a component and default-constructing the rest. `src` may be null
+    /// to default-construct throughout. Strongly exception safe: if a component
+    /// constructor throws, the columns already built are unwound.
+    void build_row(size_t row, Archetype* src, size_t src_row);
+
     std::vector<ComponentId> m_ids;
     std::vector<Column> m_columns;
     Signature m_signature;
