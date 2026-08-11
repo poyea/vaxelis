@@ -3,8 +3,7 @@
 
 find_package(Doxygen REQUIRED)
 
-# Graphviz is optional. When it is present Doxygen draws the class hierarchies;
-# without it the build still succeeds, just without diagrams.
+# Graphviz is optional; without it the build just omits the diagrams.
 if(TARGET Doxygen::dot)
     set(VAXELIS_DOXYGEN_HAVE_DOT YES)
 else()

@@ -24,9 +24,8 @@ option(VAXELIS_BUILD_TESTS "Build unit tests" ${BUILD_TESTING})
 option(VAXELIS_ENABLE_SANITIZERS "Enable ASan/UBSan in debug builds" OFF)
 option(VAXELIS_BUILD_DOCS "Build API documentation with Doxygen" OFF)
 
-# The Catch2 host tests have no runner in the browser; force them off for web.
-# The examples are desktop-only too: each would need its own shell page and
-# preload wiring, which only the runtime target carries.
+# Web ships the runtime alone: it is the only target with a shell page and
+# preloaded assets.
 if(EMSCRIPTEN)
     set(VAXELIS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(VAXELIS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)

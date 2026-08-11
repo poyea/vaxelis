@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 John Law
 
-# One executable per example. Each example is a single self-contained file that
-# depends on nothing but the engine -- no assets, no shared helper headers -- so
-# it reads top to bottom as a complete program.
+# One executable per example; each is a single self-contained file.
 function(vaxelis_add_example name)
     set(target vaxelis_example_${name})
     add_executable(${target} ${name}.cpp)

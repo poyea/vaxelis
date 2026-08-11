@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 John Law
 
-# Headless timing targets. Built by default so they cannot rot, but only ever
-# executed by the bench workflow -- a shared CI runner's numbers are far too
-# noisy to gate a merge on.
+# Built by default so they cannot rot; only the bench workflow runs them.
 add_executable(vaxelis_ecs_bench ecs_bench.cpp)
 target_link_libraries(vaxelis_ecs_bench PRIVATE vaxelis_engine)
 vaxelis_apply_target_options(vaxelis_ecs_bench)

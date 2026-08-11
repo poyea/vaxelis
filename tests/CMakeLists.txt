@@ -15,8 +15,7 @@ target_link_libraries(vaxelis_tests PRIVATE vaxelis_engine GTest::gtest_main)
 vaxelis_apply_target_options(vaxelis_tests)
 
 include(GoogleTest)
-# PRE_TEST defers discovery to ctest time, after the POST_BUILD copy below has
-# put SDL3.dll next to the exe; DL_PATHS covers the test runs themselves.
+# PRE_TEST defers discovery until after the POST_BUILD copy below.
 gtest_discover_tests(vaxelis_tests
     DL_PATHS $<TARGET_FILE_DIR:SDL3::SDL3>
     DISCOVERY_MODE PRE_TEST)
