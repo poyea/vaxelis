@@ -17,19 +17,16 @@
 
 namespace vaxelis::ecs {
 
-/// Storage for every entity carrying exactly one signature, laid out one
-/// contiguous array per component type. A query matching this archetype walks
-/// those arrays in memory order with no per-entity indirection, which is the
-/// whole reason to arrange data this way rather than as sparse sets.
+/// Every entity carrying one signature, stored as one contiguous array per
+/// component type, so a matching query walks memory in order with no
+/// per-entity indirection.
 ///
-/// Rows are addressed by index. Removing a row moves the last row into the gap
-/// (swap and pop) so removal is O(1) and columns never develop holes; the
-/// caller owns whatever maps an entity to its row and must patch it up using
-/// the index remove_row() reports.
+/// Removing a row swaps the last row into the gap, keeping removal O(1) and
+/// the columns hole-free; the caller owns the entity-to-row map and must patch
+/// it with the index remove_row() reports.
 ///
-/// Chunking -- splitting each column into fixed-size blocks -- is deliberately
-/// not here yet. It changes the allocation strategy behind these methods, not
-/// the methods themselves.
+/// Chunking is deliberately absent: it changes the allocation strategy behind
+/// these methods, not the methods themselves.
 class Archetype {
   public:
     /// Builds empty columns for `ids`; duplicates are ignored. The signature is

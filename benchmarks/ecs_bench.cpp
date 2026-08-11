@@ -5,12 +5,9 @@
 /// Headless ECS benchmark: the same workloads over entt's sparse sets and over
 /// the archetype world, with no window, device or audio, so CI can run it.
 ///
-/// Reports the best of several repetitions rather than the mean -- on a shared
-/// CI runner the mean mostly measures the neighbours, while the best run is the
-/// closest thing to the machine's real throughput.
-///
-/// Each workload prints `entt`, `arch` and the ratio between them, where below
-/// 1.00 means the archetype path was faster.
+/// Reports the best of several repetitions, not the mean: on a shared runner
+/// the mean mostly measures the neighbours. A ratio below 1.00 means the
+/// archetype path was faster.
 
 #include <algorithm>
 #include <chrono>

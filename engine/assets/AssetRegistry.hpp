@@ -20,14 +20,12 @@ namespace vaxelis {
 /// registers file watches for hot reload, fans reload notifications out to
 /// listeners, and releases everything it owns at shutdown().
 ///
-/// `T` is the cached value: a small trivially-copyable handle, plus whatever
-/// metadata the owning cache needs, exposing `bool valid() const` where invalid
-/// means "nothing loaded". Everything type-specific lives in the Ops callbacks,
-/// so supporting a new asset type is a registry plus three lambdas.
+/// `T` is a trivially-copyable handle exposing `bool valid() const`, where
+/// invalid means "nothing loaded". Everything type-specific lives in the Ops
+/// callbacks, so a new asset type is a registry plus three lambdas.
 ///
-/// Keys default to the path, so loading one path twice yields one asset. An
-/// explicit key lets several assets share a file, and adopt() binds a key to an
-/// asset with no file behind it at all (procedural textures, generated atlases).
+/// Keys default to the path, so one path loads once. An explicit key lets
+/// several assets share a file; adopt() binds a key to an asset with no file.
 ///
 /// Neither copyable nor movable: watch callbacks capture `this`.
 template <class T> class AssetRegistry {

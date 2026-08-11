@@ -25,15 +25,13 @@ namespace vaxelis::ecs {
 
 /// Entity storage on top of archetypes.
 ///
-/// Every entity lives in exactly one archetype -- the one matching the set of
-/// components it currently carries -- occupying one row. Adding or removing a
-/// component is a structural change: the entity's row moves to the archetype
-/// for its new signature. An entity with no components at all still has a row,
-/// in the empty archetype, so it can be created before it is filled in.
+/// Every entity occupies one row of the archetype matching its component set.
+/// Adding or removing a component migrates that row to the archetype for the
+/// new signature. An entity with no components lives in the empty archetype.
 ///
-/// References and pointers into component storage are invalidated by any
-/// structural change, including one on a different entity, because it can grow
-/// or reshuffle a column. Fetch them again after add(), remove() or destroy().
+/// Any structural change invalidates pointers into component storage, even one
+/// made to a different entity: it can grow or reshuffle a column. Re-fetch
+/// after add(), remove() or destroy().
 class World {
   public:
     /// Creates a world holding nothing but the empty archetype.
@@ -136,14 +134,12 @@ class World {
 
     /// Calls `fn(Ts&...)` for every entity carrying all of `Ts`.
     ///
-    /// This is what the column layout is for: each matching archetype hands
-    /// over its columns once, and the loop then walks them in memory order with
-    /// no per-entity lookup. Archetypes that lack any of `Ts` are skipped whole
-    /// on a single mask test.
+    /// Each matching archetype hands over its columns once and the loop walks
+    /// them in memory order; archetypes lacking any of `Ts` are skipped on a
+    /// single mask test.
     ///
-    /// Do not add, remove or destroy while iterating -- a structural change
-    /// reshapes the very storage being walked. Collect the entities to change
-    /// and apply afterwards.
+    /// Do not add, remove or destroy while iterating: a structural change
+    /// reshapes the storage being walked. Collect and apply afterwards.
     template <class... Ts, class Fn> void each(Fn&& fn) {
         visit_matching<Ts...>(*this, [&fn](Entity, auto&... cols) { fn(cols...); });
     }

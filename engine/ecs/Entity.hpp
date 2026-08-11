@@ -13,10 +13,9 @@ namespace vaxelis::ecs {
 /// Handle to an entity: a slot index plus the generation that slot carried when
 /// the handle was made.
 ///
-/// Slots are recycled, so an index on its own would silently alias whatever
-/// entity reused it. Destroying an entity bumps its slot's generation, which
-/// makes every handle still pointing at the old entity compare unequal and read
-/// as dead instead of quietly addressing a stranger.
+/// Slots are recycled, so a bare index would silently alias whatever entity
+/// reused it. Destroying an entity bumps its slot's generation, so stale
+/// handles compare unequal and read as dead.
 struct Entity {
     /// Slot this entity occupies in the world's record table.
     uint32_t index{0};

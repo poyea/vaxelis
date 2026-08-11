@@ -2,30 +2,16 @@
 // Copyright (c) 2026 John Law
 
 /// @file
-/// Scene stress harness: builds a scene of a chosen size and hierarchy depth,
-/// then times the three passes a frame actually spends its budget on.
+/// Times four passes over a scene of adjustable size and depth: a flat entt
+/// sweep, the hierarchy DFS, sprite submission, and the same flat sweep over
+/// archetype columns.
 ///
-///   animate    a flat `view<Transform2D>` sweep -- the sparse set's dense
-///              array walked in memory order, the fast path
-///   transform  Scene::update_world_transforms(), a recursive DFS over
-///              Hierarchy::children with random component access per node
-///   render     Scene::render_sprites(), which gathers, sorts by (z, texture)
-///              and submits
-///   archetype  the same work as `animate`, over ecs::World columns instead
+/// `dfs/flat` is what the scene graph costs. `arch/flat` is archetype storage
+/// against entt's on identical work -- but the archetype world mirrors only the
+/// entity count and Transform2D, so read it as an upper bound.
 ///
-/// Two ratios come out of that. `dfs/flat` is the cost of the scene graph:
-/// same entities, same count, one walked linearly and one walked as a tree.
-/// `arch/flat` is archetype columns against entt's sparse set on identical
-/// work, which is the number that says whether migrating storage is worth
-/// anything. Drag the sliders until they separate.
-///
-/// The archetype world mirrors only the entity count and Transform2D -- it has
-/// no hierarchy and no sprites -- so `arch/flat` compares storage layout, not
-/// engines. Read it as an upper bound on what migrating could buy.
-///
-/// Note render_sprites() refreshes world transforms itself, so its number
-/// includes a second transform pass; subtract `transform` to read the
-/// gather/sort/submit cost on its own.
+/// render_sprites() refreshes world transforms itself, so subtract `transform`
+/// from `render` to get the gather/sort/submit cost alone.
 
 #include <algorithm>
 #include <array>
