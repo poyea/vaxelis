@@ -19,6 +19,10 @@ void World::report_stale(const char* op) {
     VX_ERROR("ecs: World::{} called with a stale entity handle", op);
 }
 
+void World::report_unregistered(const char* op) {
+    VX_ERROR("ecs: World::{} on a type that could not register; limit is {}", op, kMaxComponents);
+}
+
 World::Record* World::find(Entity e) {
     return alive(e) ? &m_records[e.index] : nullptr;
 }

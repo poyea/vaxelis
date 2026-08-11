@@ -87,9 +87,9 @@ class World {
         }
         const ComponentId id = component_id<T>();
         if (id == kInvalidComponent) {
-            // Registration failed, so no archetype can ever hold this type and
+            // Registration failed, so no archetype can hold this type and
             // migrating would land the row in a column that does not exist.
-            report_stale("add");
+            report_unregistered("add");
             return nullptr;
         }
         if (!rec->table->archetype.has(id)) {
@@ -196,9 +196,9 @@ class World {
     Record* find(Entity e);
     const Record* find(Entity e) const;
 
-    /// Logs use of a stale handle. Out of line so this header does not drag the
-    /// logger into everything that includes it.
+    /// Misuse reports. Out of line so this header does not drag in the logger.
     static void report_stale(const char* op);
+    static void report_unregistered(const char* op);
 
     /// The one query walk behind each() and each_entity(). Deducing `Self` lets
     /// the same body serve `World&` and `const World&` -- the archetype's own
