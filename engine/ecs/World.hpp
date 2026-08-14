@@ -7,6 +7,7 @@
 /// The archetype world: owns entities, the archetypes they live in, and the
 /// mapping between the two.
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -45,6 +46,28 @@ class World {
 
     /// Creates an entity with no components.
     Entity create();
+
+    /// Creates an entity already carrying `values`.
+    ///
+    /// The component set is a compile-time pack, so the destination archetype
+    /// is resolved once and the row seated straight into it. Building the same
+    /// entity with create() then N add() calls instead walks N intermediate
+    /// archetypes, migrating the row at every step.
+    template <class... Ts> Entity create(Ts&&... values) {
+        using Ids = std::array<ComponentId, sizeof...(Ts)>;
+        const Ids ids{component_id<std::remove_cvref_t<Ts>>()...};
+        Signature sig;
+        for (const ComponentId id : ids)
+            sig.set(id);
+
+        const Entity e = allocate_slot();
+        seat(e, table_for(sig, ids));
+        ++m_live;
+        // seat() default-constructed the columns; drop the supplied values over
+        // them in one pass, still without a migration.
+        (assign_value<std::remove_cvref_t<Ts>>(e, std::forward<Ts>(values)), ...);
+        return e;
+    }
 
     /// Destroys `e` and its components. Stale handles are ignored, so calling
     /// this twice is harmless.
@@ -176,6 +199,15 @@ class World {
         uint32_t generation{0};
         bool alive{false};
     };
+
+    /// Takes a free entity slot, or grows the record table for a new one.
+    Entity allocate_slot();
+
+    /// Overwrites `e`'s `T` if it has one. Used by the variadic create().
+    template <class T, class U> void assign_value(Entity e, U&& value) {
+        if (T* slot = try_get<T>(e))
+            *slot = std::forward<U>(value);
+    }
 
     /// Finds the table for `sig`, creating it when this shape is new.
     Table& table_for(Signature sig, std::span<const ComponentId> ids);

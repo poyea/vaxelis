@@ -413,3 +413,50 @@ TEST(World, RemovingTheLastComponentReturnsToTheEmptyArchetype) {
     // Back in the archetype it started in; no duplicate empty table minted.
     EXPECT_EQ(w.archetype_count(), shapes);
 }
+
+TEST(World, VariadicCreateSeatsDirectlyWithoutMigrating) {
+    World w;
+    const Entity e = w.create(Pos{1.0f, 2.0f}, Vel{3.0f});
+
+    EXPECT_TRUE(w.alive(e));
+    ASSERT_TRUE(w.has<Pos>(e));
+    ASSERT_TRUE(w.has<Vel>(e));
+    EXPECT_FLOAT_EQ(w.try_get<Pos>(e)->x, 1.0f);
+    EXPECT_FLOAT_EQ(w.try_get<Pos>(e)->y, 2.0f);
+    EXPECT_FLOAT_EQ(w.try_get<Vel>(e)->dx, 3.0f);
+
+    // The proof that nothing migrated: building this incrementally would have
+    // created a {Pos} archetype on the way to {Pos, Vel}. Only the empty one
+    // and the destination exist.
+    EXPECT_EQ(w.archetype_count(), 2u);
+}
+
+TEST(World, VariadicCreateAgreesWithIncrementalConstruction) {
+    World w;
+    const Entity built = w.create();
+    w.add<Pos>(built, Pos{5.0f, 6.0f});
+    w.add<Vel>(built, Vel{7.0f});
+    const size_t shapes = w.archetype_count();
+
+    const Entity direct = w.create(Pos{5.0f, 6.0f}, Vel{7.0f});
+
+    EXPECT_FLOAT_EQ(w.try_get<Pos>(direct)->x, w.try_get<Pos>(built)->x);
+    EXPECT_FLOAT_EQ(w.try_get<Vel>(direct)->dx, w.try_get<Vel>(built)->dx);
+    // Same shape, so it reuses the archetype rather than minting another.
+    EXPECT_EQ(w.archetype_count(), shapes);
+    EXPECT_EQ(w.size(), 2u);
+}
+
+TEST(World, VariadicCreateDestroysWhatItBuilt) {
+    Counted::alive = 0;
+    {
+        World w;
+        for (int i = 0; i < 32; ++i)
+            w.create(Counted{i}, Pos{static_cast<float>(i), 0.0f});
+        EXPECT_EQ(Counted::alive, 32);
+
+        w.destroy(w.create(Counted{99}));
+        EXPECT_EQ(Counted::alive, 32);
+    }
+    EXPECT_EQ(Counted::alive, 0);
+}

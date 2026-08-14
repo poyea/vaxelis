@@ -65,19 +65,22 @@ void World::migrate(Entity e, Record& rec, Signature target) {
     Table& from = *rec.table;
 
     // The destination needs an id list, not just the mask: keep the source's
-    // ids that survive, then pick up whichever id the change added.
-    std::vector<ComponentId> ids;
-    ids.reserve(from.archetype.component_ids().size() + 1);
+    // surviving ids, then pick up whichever id the change added. The count is
+    // capped at kMaxComponents, so this lives on the stack -- a structural
+    // change should not cost a heap allocation. std::inplace_vector once the
+    // compiler floor reaches it.
+    std::array<ComponentId, kMaxComponents> ids{};
+    size_t count = 0;
     for (const ComponentId id : from.archetype.component_ids()) {
         if (target.test(id))
-            ids.push_back(id);
+            ids[count++] = id;
     }
     for (ComponentId id = 0; id < registered_component_count(); ++id) {
         if (target.test(id) && !from.archetype.has(id))
-            ids.push_back(id);
+            ids[count++] = id;
     }
 
-    Table& to = table_for(target, ids);
+    Table& to = table_for(target, std::span<const ComponentId>(ids.data(), count));
     const size_t old_row = rec.row;
     rec.row = to.archetype.move_row_from(from.archetype, old_row);
     rec.table = &to;
@@ -88,7 +91,7 @@ void World::migrate(Entity e, Record& rec, Signature target) {
     unseat(from, old_row);
 }
 
-Entity World::create() {
+Entity World::allocate_slot() {
     uint32_t index = 0;
     if (!m_free.empty()) {
         index = m_free.back();
@@ -103,8 +106,11 @@ Entity World::create() {
     if (rec.generation == 0)
         rec.generation = 1;
     rec.alive = true;
+    return Entity{.index = index, .generation = rec.generation};
+}
 
-    const Entity e{.index = index, .generation = rec.generation};
+Entity World::create() {
+    const Entity e = allocate_slot();
     seat(e, *m_empty);
     ++m_live;
     return e;
