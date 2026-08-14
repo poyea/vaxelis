@@ -14,9 +14,8 @@ jobs:
     # merge on, so this job never fails the commit it reports about.
     continue-on-error: true
     runs-on: ubuntu-24.04
-    # Only to attach results to the commit; nothing else is written.
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,16 +57,3 @@ jobs:
             echo ""
             cat bench.txt
           } >> "$GITHUB_STEP_SUMMARY"
-      # Job logs need a token to read, so the table goes on the commit too. That
-      # makes each run publicly readable and leaves a history to compare against.
-      - name: Attach results to the commit
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          jq -Rs '{body: ("### ECS benchmark\n\nRatio below 1.00 means the archetype path was faster.\n\n" + .)}' \
-            bench.txt > payload.json
-          curl -sS -X POST \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${GITHUB_SHA}/comments" \
-            -d @payload.json > /dev/null
