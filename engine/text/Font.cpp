@@ -4,7 +4,15 @@
 #include "engine/text/Font.hpp"
 
 #include <algorithm>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb_truetype.h>
+
+#include "engine/core/Log.hpp"
 #include "engine/renderer/SpriteRenderer.hpp"
 
 namespace vaxelis {
@@ -17,6 +25,66 @@ const Glyph* BakedFont::find(uint32_t codepoint) const {
 }
 
 namespace text {
+
+BakedFont bake(std::span<const std::byte> ttf, float pixel_height, uint32_t first_codepoint,
+               uint32_t count, uint32_t atlas_size) {
+    BakedFont out;
+    if (ttf.empty() || pixel_height <= 0.0f || count == 0 || atlas_size == 0)
+        return out;
+
+    const auto* data = reinterpret_cast<const unsigned char*>(ttf.data());
+
+    // Line spacing comes from the font's own vertical metrics rather than the
+    // requested pixel height, which is only the em size.
+    stbtt_fontinfo info;
+    if (stbtt_InitFont(&info, data, stbtt_GetFontOffsetForIndex(data, 0)) == 0) {
+        VX_ERROR("Font: not a usable font file");
+        return out;
+    }
+    int ascent = 0;
+    int descent = 0;
+    int line_gap = 0;
+    stbtt_GetFontVMetrics(&info, &ascent, &descent, &line_gap);
+    const float scale = stbtt_ScaleForPixelHeight(&info, pixel_height);
+
+    std::vector<unsigned char> coverage(static_cast<size_t>(atlas_size) * atlas_size, 0);
+    std::vector<stbtt_bakedchar> baked(count);
+    const int rows = stbtt_BakeFontBitmap(data, 0, pixel_height, coverage.data(),
+                                          static_cast<int>(atlas_size),
+                                          static_cast<int>(atlas_size),
+                                          static_cast<int>(first_codepoint),
+                                          static_cast<int>(count), baked.data());
+    if (rows <= 0) {
+        VX_ERROR("Font: {} glyphs at {}px do not fit a {}x{} atlas", count, pixel_height,
+                 atlas_size, atlas_size);
+        return out;
+    }
+
+    // The bake produces coverage only. Expand to white RGBA with coverage in
+    // alpha, so a glyph takes its colour from the vertex colour it is drawn
+    // with rather than being baked one colour.
+    out.pixels.resize(coverage.size());
+    for (size_t i = 0; i < coverage.size(); ++i)
+        out.pixels[i] = 0x00FFFFFFu | (static_cast<uint32_t>(coverage[i]) << 24);
+
+    const float inv = 1.0f / static_cast<float>(atlas_size);
+    out.glyphs.reserve(count);
+    for (const stbtt_bakedchar& b : baked) {
+        Glyph g;
+        g.uv = {static_cast<float>(b.x0) * inv, static_cast<float>(b.y0) * inv,
+                static_cast<float>(b.x1) * inv, static_cast<float>(b.y1) * inv};
+        g.size = {static_cast<float>(b.x1 - b.x0), static_cast<float>(b.y1 - b.y0)};
+        g.offset = {b.xoff, b.yoff};
+        g.advance = b.xadvance;
+        out.glyphs.push_back(g);
+    }
+
+    out.width = atlas_size;
+    out.height = atlas_size;
+    out.first_codepoint = first_codepoint;
+    out.line_height = static_cast<float>(ascent - descent + line_gap) * scale;
+    return out;
+}
 
 vec2 measure(const BakedFont& font, std::string_view str) {
     if (!font.valid())
@@ -67,5 +135,40 @@ void draw(SpriteBatch& batch, rhi::TextureHandle atlas, const BakedFont& font,
 }
 
 } // namespace text
+
+bool Font::load(rhi::IDevice& device, std::string_view path, float pixel_height) {
+    std::ifstream file{std::string(path), std::ios::binary};
+    if (!file) {
+        VX_ERROR("Font: cannot open {}", path);
+        return false;
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    const std::string bytes = buffer.str();
+
+    m_baked = text::bake({reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()},
+                         pixel_height);
+    if (!m_baked.valid())
+        return false;
+
+    const auto tex = device.create_texture({.width = m_baked.width,
+                                            .height = m_baked.height,
+                                            .format = rhi::TextureFormat::RGBA8,
+                                            .initial_data = m_baked.pixels.data()});
+    if (!tex) {
+        VX_ERROR("Font: atlas upload failed for {}", path);
+        m_baked = {};
+        return false;
+    }
+    m_atlas = *tex;
+    return true;
+}
+
+void Font::shutdown(rhi::IDevice& device) {
+    if (m_atlas.valid())
+        device.destroy(m_atlas);
+    m_atlas = {};
+    m_baked = {};
+}
 
 } // namespace vaxelis

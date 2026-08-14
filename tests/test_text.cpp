@@ -188,3 +188,17 @@ TEST(Text, NothingIsDrawnWithoutAFontOrAtlas) {
     EXPECT_EQ(dev.draw_calls, 0);
     batch.shutdown(dev);
 }
+
+TEST(Font, BakeRejectsInputThatIsNotAFont) {
+    // No .ttf ships with the engine, so the bake path is covered by what it
+    // must refuse rather than what it produces.
+    EXPECT_FALSE(text::bake({}, 16.0f).valid());
+
+    const std::vector<std::byte> garbage(2048, std::byte{0x7F});
+    EXPECT_FALSE(text::bake(garbage, 16.0f).valid());
+
+    // Degenerate parameters are refused before stb ever sees them.
+    EXPECT_FALSE(text::bake(garbage, 0.0f).valid());
+    EXPECT_FALSE(text::bake(garbage, 16.0f, 32, 0).valid());
+    EXPECT_FALSE(text::bake(garbage, 16.0f, 32, 95, 0).valid());
+}

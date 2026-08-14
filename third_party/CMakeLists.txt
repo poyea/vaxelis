@@ -26,7 +26,9 @@ add_subdirectory(SDL EXCLUDE_FROM_ALL)
 
 # --- stb (header-only INTERFACE) ---
 add_library(stb INTERFACE)
-target_include_directories(stb INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
+# SYSTEM: these headers are compiled into our targets under -Werror, and
+# third-party warnings are not ours to fix.
+target_include_directories(stb SYSTEM INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/stb)
 
 # --- miniaudio (header-only; implementation compiled in engine/audio/Audio.cpp) ---
 add_library(miniaudio INTERFACE)
