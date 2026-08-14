@@ -19,6 +19,7 @@ add_library(vaxelis_engine STATIC
     rhi/gl/GLDevice.cpp
     rhi/vk/VkDevice.cpp
     renderer/SpriteRenderer.cpp
+    scene/Animation.cpp
     scene/Scene.cpp
     scene/SceneSerializer.cpp
     script/Script.cpp
