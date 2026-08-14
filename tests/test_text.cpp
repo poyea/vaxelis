@@ -66,13 +66,22 @@ BakedFont make_font() {
     f.first_codepoint = 'A';
     f.line_height = 20.0f;
     f.pixels.assign(64 * 64, 0xFFFFFFFFu);
-    f.glyphs = {
-        Glyph{.uv = {0.0f, 0.0f, 0.25f, 0.25f}, .size = {8.0f, 16.0f}, .offset = {1.0f, -12.0f},
-              .advance = 10.0f},
-        Glyph{.uv = {0.25f, 0.0f, 0.5f, 0.25f}, .size = {6.0f, 16.0f}, .offset = {0.0f, -12.0f},
-              .advance = 7.0f},
-        Glyph{.uv = {}, .size = {0.0f, 0.0f}, .offset = {}, .advance = 5.0f},
-    };
+    Glyph a;
+    a.uv = {0.0f, 0.0f, 0.25f, 0.25f};
+    a.size = {8.0f, 16.0f};
+    a.offset = {1.0f, -12.0f};
+    a.advance = 10.0f;
+
+    Glyph b;
+    b.uv = {0.25f, 0.0f, 0.5f, 0.25f};
+    b.size = {6.0f, 16.0f};
+    b.offset = {0.0f, -12.0f};
+    b.advance = 7.0f;
+
+    Glyph space;
+    space.advance = 5.0f;
+
+    f.glyphs = {a, b, space};
     return f;
 }
 

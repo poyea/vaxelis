@@ -72,8 +72,8 @@ vec2 measure(const BakedFont& font, std::string_view str);
 /// Caller controls batch begin/end, as with tiled::render. Every glyph comes
 /// from one atlas, so a whole string costs one draw call as long as nothing
 /// else changes texture in between.
-void draw(SpriteBatch& batch, rhi::TextureHandle atlas, const BakedFont& font,
-          std::string_view str, vec2 pos, vec4 color = vec4(1.0f));
+void draw(SpriteBatch& batch, rhi::TextureHandle atlas, const BakedFont& font, std::string_view str,
+          vec2 pos, vec4 color = vec4(1.0f));
 
 } // namespace text
 

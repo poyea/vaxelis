@@ -49,11 +49,12 @@ BakedFont bake(std::span<const std::byte> ttf, float pixel_height, uint32_t firs
 
     std::vector<unsigned char> coverage(static_cast<size_t>(atlas_size) * atlas_size, 0);
     std::vector<stbtt_bakedchar> baked(count);
-    const int rows = stbtt_BakeFontBitmap(data, 0, pixel_height, coverage.data(),
-                                          static_cast<int>(atlas_size),
-                                          static_cast<int>(atlas_size),
-                                          static_cast<int>(first_codepoint),
-                                          static_cast<int>(count), baked.data());
+    unsigned char* bmp = coverage.data();
+    stbtt_bakedchar* chars = baked.data();
+    const int edge = static_cast<int>(atlas_size);
+    const int first = static_cast<int>(first_codepoint);
+    const int n = static_cast<int>(count);
+    const int rows = stbtt_BakeFontBitmap(data, 0, pixel_height, bmp, edge, edge, first, n, chars);
     if (rows <= 0) {
         VX_ERROR("Font: {} glyphs at {}px do not fit a {}x{} atlas", count, pixel_height,
                  atlas_size, atlas_size);
@@ -70,9 +71,13 @@ BakedFont bake(std::span<const std::byte> ttf, float pixel_height, uint32_t firs
     const float inv = 1.0f / static_cast<float>(atlas_size);
     out.glyphs.reserve(count);
     for (const stbtt_bakedchar& b : baked) {
+        const float u0 = static_cast<float>(b.x0) * inv;
+        const float v0 = static_cast<float>(b.y0) * inv;
+        const float u1 = static_cast<float>(b.x1) * inv;
+        const float v1 = static_cast<float>(b.y1) * inv;
+
         Glyph g;
-        g.uv = {static_cast<float>(b.x0) * inv, static_cast<float>(b.y0) * inv,
-                static_cast<float>(b.x1) * inv, static_cast<float>(b.y1) * inv};
+        g.uv = {u0, v0, u1, v1};
         g.size = {static_cast<float>(b.x1 - b.x0), static_cast<float>(b.y1 - b.y0)};
         g.offset = {b.xoff, b.yoff};
         g.advance = b.xadvance;
@@ -107,8 +112,8 @@ vec2 measure(const BakedFont& font, std::string_view str) {
     return {widest, static_cast<float>(lines) * font.line_height};
 }
 
-void draw(SpriteBatch& batch, rhi::TextureHandle atlas, const BakedFont& font,
-          std::string_view str, vec2 pos, vec4 color) {
+void draw(SpriteBatch& batch, rhi::TextureHandle atlas, const BakedFont& font, std::string_view str,
+          vec2 pos, vec4 color) {
     if (!font.valid() || !atlas.valid())
         return;
 
@@ -146,15 +151,18 @@ bool Font::load(rhi::IDevice& device, std::string_view path, float pixel_height)
     buffer << file.rdbuf();
     const std::string bytes = buffer.str();
 
-    m_baked = text::bake({reinterpret_cast<const std::byte*>(bytes.data()), bytes.size()},
-                         pixel_height);
+    const auto* first = reinterpret_cast<const std::byte*>(bytes.data());
+    m_baked = text::bake({first, bytes.size()}, pixel_height);
     if (!m_baked.valid())
         return false;
 
-    const auto tex = device.create_texture({.width = m_baked.width,
-                                            .height = m_baked.height,
-                                            .format = rhi::TextureFormat::RGBA8,
-                                            .initial_data = m_baked.pixels.data()});
+    rhi::TextureDesc td{
+        .width = m_baked.width,
+        .height = m_baked.height,
+        .format = rhi::TextureFormat::RGBA8,
+        .initial_data = m_baked.pixels.data(),
+    };
+    const auto tex = device.create_texture(td);
     if (!tex) {
         VX_ERROR("Font: atlas upload failed for {}", path);
         m_baked = {};
