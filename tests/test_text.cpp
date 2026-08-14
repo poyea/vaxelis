@@ -203,8 +203,14 @@ TEST(Font, BakeRejectsInputThatIsNotAFont) {
     // must refuse rather than what it produces.
     EXPECT_FALSE(text::bake({}, 16.0f).valid());
 
+    // Not a font: the format probe reports -1, which must not reach
+    // stbtt_InitFont as a base-pointer offset.
     const std::vector<std::byte> garbage(2048, std::byte{0x7F});
     EXPECT_FALSE(text::bake(garbage, 16.0f).valid());
+
+    // Too short for even the offset table to be read safely.
+    const std::vector<std::byte> stub(4, std::byte{0x00});
+    EXPECT_FALSE(text::bake(stub, 16.0f).valid());
 
     // Degenerate parameters are refused before stb ever sees them.
     EXPECT_FALSE(text::bake(garbage, 0.0f).valid());

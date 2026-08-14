@@ -29,15 +29,26 @@ namespace text {
 BakedFont bake(std::span<const std::byte> ttf, float pixel_height, uint32_t first_codepoint,
                uint32_t count, uint32_t atlas_size) {
     BakedFont out;
-    if (ttf.empty() || pixel_height <= 0.0f || count == 0 || atlas_size == 0)
+    // 12 bytes is the sfnt offset table; below that even the format probe would
+    // read past the buffer, since stb_truetype's entry points take no length.
+    if (ttf.size() < 12 || pixel_height <= 0.0f || count == 0 || atlas_size == 0)
         return out;
 
     const auto* data = reinterpret_cast<const unsigned char*>(ttf.data());
 
+    // Returns -1 for anything that is not a font or a collection. Passing that
+    // to stbtt_InitFont would offset the base pointer by -1 and read out of
+    // bounds, so this check is load-bearing rather than defensive.
+    const int offset = stbtt_GetFontOffsetForIndex(data, 0);
+    if (offset < 0) {
+        VX_ERROR("Font: data is not a font file");
+        return out;
+    }
+
     // Line spacing comes from the font's own vertical metrics rather than the
     // requested pixel height, which is only the em size.
     stbtt_fontinfo info;
-    if (stbtt_InitFont(&info, data, stbtt_GetFontOffsetForIndex(data, 0)) == 0) {
+    if (stbtt_InitFont(&info, data, offset) == 0) {
         VX_ERROR("Font: not a usable font file");
         return out;
     }
