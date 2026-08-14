@@ -1,12 +1,14 @@
-# SPDX-License-Identifier: MIT
-# Copyright (c) 2026 John Law
-
 name: bench
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+
+# Supersede an in-flight run when a newer commit lands on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ecs-bench:
