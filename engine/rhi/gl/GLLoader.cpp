@@ -58,6 +58,11 @@ bool load_gl() {
     VX_LOAD(TexParameteri);
     VX_LOAD(DeleteTextures);
     VX_LOAD(ActiveTexture);
+    VX_LOAD(GenFramebuffers);
+    VX_LOAD(BindFramebuffer);
+    VX_LOAD(FramebufferTexture2D);
+    VX_LOAD(CheckFramebufferStatus);
+    VX_LOAD(DeleteFramebuffers);
     VX_LOAD(CreateShader);
     VX_LOAD(ShaderSource);
     VX_LOAD(CompileShader);

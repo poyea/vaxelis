@@ -62,6 +62,9 @@ inline constexpr GLenum GL_SRC_ALPHA = 0x0302;
 inline constexpr GLenum GL_ONE_MINUS_SRC_ALPHA = 0x0303;
 inline constexpr GLenum GL_DEPTH_TEST = 0x0B71;
 inline constexpr GLenum GL_UNPACK_ALIGNMENT = 0x0CF5;
+inline constexpr GLenum GL_FRAMEBUFFER = 0x8D40;
+inline constexpr GLenum GL_COLOR_ATTACHMENT0 = 0x8CE0;
+inline constexpr GLenum GL_FRAMEBUFFER_COMPLETE = 0x8CD5;
 
 // --- Function pointer table ---
 struct GLApi {
@@ -91,6 +94,12 @@ struct GLApi {
     void (*TexParameteri)(GLenum, GLenum, GLint);
     void (*DeleteTextures)(GLsizei, const GLuint*);
     void (*ActiveTexture)(GLenum);
+
+    void (*GenFramebuffers)(GLsizei, GLuint*);
+    void (*BindFramebuffer)(GLenum, GLuint);
+    void (*FramebufferTexture2D)(GLenum, GLenum, GLenum, GLuint, GLint);
+    GLenum (*CheckFramebufferStatus)(GLenum);
+    void (*DeleteFramebuffers)(GLsizei, const GLuint*);
 
     GLuint (*CreateShader)(GLenum);
     void (*ShaderSource)(GLuint, GLsizei, const GLchar* const*, const GLint*);

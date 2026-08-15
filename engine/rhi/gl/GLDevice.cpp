@@ -24,6 +24,12 @@ struct GLShader {
     GLint mvp_loc;
     GLint tex_loc;
 };
+struct GLRenderTarget {
+    GLuint fbo;
+    TextureHandle color;
+    uint32_t width;
+    uint32_t height;
+};
 struct GLBuffer {
     GLuint name;
     GLenum target;
@@ -45,12 +51,15 @@ class GLDevice final : public IDevice {
         assert(m_textures.empty() && "GLDevice: texture handles leaked");
         assert(m_shaders.empty() && "GLDevice: shader handles leaked");
         assert(m_buffers.empty() && "GLDevice: buffer handles leaked");
+        assert(m_targets.empty() && "GLDevice: render target handles leaked");
         for (auto& [_, t] : m_textures)
             gl().DeleteTextures(1, &t.name);
         for (auto& [_, s] : m_shaders)
             gl().DeleteProgram(s.program);
         for (auto& [_, b] : m_buffers)
             gl().DeleteBuffers(1, &b.name);
+        for (auto& [_, r] : m_targets)
+            gl().DeleteFramebuffers(1, &r.fbo);
         gl().DeleteVertexArrays(1, &m_vao);
         VX_INFO("GLDevice: destroyed");
     }
@@ -143,6 +152,81 @@ class GLDevice final : public IDevice {
         return h;
     }
 
+    vaxelis::expected<RenderTargetHandle, RhiError>
+    create_render_target(const RenderTargetDesc& d) override {
+        if (d.format != TextureFormat::RGBA8)
+            return vaxelis::unexpected(RhiError::UnsupportedFormat);
+        if (d.width == 0 || d.height == 0)
+            return vaxelis::unexpected(RhiError::OutOfMemory);
+
+        // The colour attachment is an ordinary texture, so everything that can
+        // sample a texture can sample a target without special-casing it.
+        auto color = create_texture({.width = d.width, .height = d.height, .format = d.format});
+        if (!color)
+            return vaxelis::unexpected(color.error());
+
+        GLuint fbo = 0;
+        gl().GenFramebuffers(1, &fbo);
+        gl().BindFramebuffer(GL_FRAMEBUFFER, fbo);
+        gl().FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                                  m_textures.at(color->id).name, 0);
+        const GLenum status = gl().CheckFramebufferStatus(GL_FRAMEBUFFER);
+        // Rebind the backbuffer whatever happened, so a failure here cannot
+        // leave the caller drawing into a half-built target.
+        gl().BindFramebuffer(GL_FRAMEBUFFER, 0);
+        if (status != GL_FRAMEBUFFER_COMPLETE) {
+            VX_ERROR("GLDevice: framebuffer incomplete (status 0x{:X})", status);
+            gl().DeleteFramebuffers(1, &fbo);
+            destroy(*color);
+            return vaxelis::unexpected(RhiError::UnsupportedFormat);
+        }
+
+        RenderTargetHandle h{m_next_handle++};
+        m_targets.emplace(h.id, GLRenderTarget{fbo, *color, d.width, d.height});
+        return h;
+    }
+
+    void destroy(RenderTargetHandle h) override {
+        auto it = m_targets.find(h.id);
+        if (it == m_targets.end())
+            return;
+        // Unbind first: deleting the bound framebuffer would leave the GL
+        // context pointing at a deleted object.
+        if (m_bound_target.id == h.id)
+            set_render_target({}, vec4{0.0f});
+        gl().DeleteFramebuffers(1, &it->second.fbo);
+        const TextureHandle color = it->second.color;
+        m_targets.erase(it);
+        destroy(color);
+    }
+
+    TextureHandle render_target_texture(RenderTargetHandle h) const override {
+        const auto it = m_targets.find(h.id);
+        return it != m_targets.end() ? it->second.color : TextureHandle{};
+    }
+
+    void set_render_target(RenderTargetHandle target, vec4 clear_color) override {
+        if (!target.valid()) {
+            gl().BindFramebuffer(GL_FRAMEBUFFER, 0);
+            gl().Viewport(0, 0, static_cast<GLsizei>(m_fb_width),
+                          static_cast<GLsizei>(m_fb_height));
+            m_bound_target = {};
+            return;
+        }
+
+        const auto it = m_targets.find(target.id);
+        if (it == m_targets.end()) {
+            VX_ERROR("GLDevice: set_render_target on an unknown handle");
+            return;
+        }
+        gl().BindFramebuffer(GL_FRAMEBUFFER, it->second.fbo);
+        gl().Viewport(0, 0, static_cast<GLsizei>(it->second.width),
+                      static_cast<GLsizei>(it->second.height));
+        gl().ClearColor(clear_color.r, clear_color.g, clear_color.b, clear_color.a);
+        gl().Clear(GL_COLOR_BUFFER_BIT);
+        m_bound_target = target;
+    }
+
     void destroy(TextureHandle h) override {
         auto it = m_textures.find(h.id);
         if (it == m_textures.end())
@@ -194,6 +278,10 @@ class GLDevice final : public IDevice {
     }
 
     void begin_frame(vec4 c, uint32_t w, uint32_t h) override {
+        // Remembered so returning from an offscreen pass can restore the
+        // backbuffer viewport.
+        m_fb_width = w;
+        m_fb_height = h;
         gl().Viewport(0, 0, static_cast<GLsizei>(w), static_cast<GLsizei>(h));
         gl().Disable(GL_DEPTH_TEST);
         gl().Enable(GL_BLEND);
@@ -242,6 +330,10 @@ class GLDevice final : public IDevice {
     std::unordered_map<uint32_t, GLTexture> m_textures;
     std::unordered_map<uint32_t, GLShader> m_shaders;
     std::unordered_map<uint32_t, GLBuffer> m_buffers;
+    std::unordered_map<uint32_t, GLRenderTarget> m_targets;
+    RenderTargetHandle m_bound_target{};
+    uint32_t m_fb_width{0};
+    uint32_t m_fb_height{0};
 };
 
 } // namespace
