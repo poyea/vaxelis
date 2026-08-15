@@ -171,9 +171,10 @@ class GLDevice final : public IDevice {
         gl().FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                                   m_textures.at(color->id).name, 0);
         const GLenum status = gl().CheckFramebufferStatus(GL_FRAMEBUFFER);
-        // Rebind the backbuffer whatever happened, so a failure here cannot
-        // leave the caller drawing into a half-built target.
-        gl().BindFramebuffer(GL_FRAMEBUFFER, 0);
+        // Put back whatever was bound before, rather than assuming the
+        // backbuffer: creating a target during a pass must not silently
+        // redirect the rest of that pass.
+        restore_binding();
         if (status != GL_FRAMEBUFFER_COMPLETE) {
             VX_ERROR("GLDevice: framebuffer incomplete (status 0x{:X})", status);
             gl().DeleteFramebuffers(1, &fbo);
@@ -205,11 +206,23 @@ class GLDevice final : public IDevice {
         return it != m_targets.end() ? it->second.color : TextureHandle{};
     }
 
+    /// Rebinds whatever set_render_target last selected, without clearing it.
+    /// Used after temporarily binding a framebuffer for setup.
+    void restore_binding() {
+        const auto it = m_targets.find(m_bound_target.id);
+        gl().BindFramebuffer(GL_FRAMEBUFFER, it != m_targets.end() ? it->second.fbo : 0);
+    }
+
     void set_render_target(RenderTargetHandle target, vec4 clear_color) override {
         if (!target.valid()) {
             gl().BindFramebuffer(GL_FRAMEBUFFER, 0);
-            gl().Viewport(0, 0, static_cast<GLsizei>(m_fb_width),
-                          static_cast<GLsizei>(m_fb_height));
+            // Before the first begin_frame the backbuffer size is unknown; a
+            // 0x0 viewport would silently discard everything drawn afterwards,
+            // so leave whatever GL already had.
+            if (m_fb_width > 0 && m_fb_height > 0) {
+                gl().Viewport(0, 0, static_cast<GLsizei>(m_fb_width),
+                              static_cast<GLsizei>(m_fb_height));
+            }
             m_bound_target = {};
             return;
         }
