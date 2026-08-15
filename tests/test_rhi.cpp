@@ -27,3 +27,12 @@ TEST(Rhi, ToStringCoversAllErrors) {
     EXPECT_EQ(to_string(RhiError::BackendUnavailable), "BackendUnavailable");
     EXPECT_EQ(to_string(RhiError::ShaderCompileFailed), "ShaderCompileFailed");
 }
+
+TEST(Rhi, SamplerDefaultsLeaveExistingBehaviourUnchanged) {
+    // The filter field was added after these descs were already in use, so its
+    // default has to be the sampler state the device hardcoded before.
+    EXPECT_EQ(TextureDesc{}.filter, TextureFilter::Linear);
+    EXPECT_EQ(RenderTargetDesc{}.filter, TextureFilter::Linear);
+    // Pixel art has to ask for Nearest explicitly; see TextureFilter.
+    EXPECT_NE(TextureFilter::Nearest, TextureFilter::Linear);
+}

@@ -244,6 +244,10 @@ class Platformer final : public vaxelis::Application {
                           .create_texture({.width = w,
                                            .height = h,
                                            .format = vaxelis::rhi::TextureFormat::RGBA8,
+                                           // Pixel art in an atlas: Linear would
+                                           // bleed neighbouring tiles across the
+                                           // cell edges the tilemap samples at.
+                                           .filter = vaxelis::rhi::TextureFilter::Nearest,
                                            .initial_data = px.data()})
                           .value_or(vaxelis::rhi::TextureHandle{});
         m_assets.adopt_texture(key, handle);

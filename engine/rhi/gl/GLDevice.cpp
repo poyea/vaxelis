@@ -74,8 +74,10 @@ class GLDevice final : public IDevice {
         gl().TexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(GL_RGBA8),
                         static_cast<GLsizei>(d.width), static_cast<GLsizei>(d.height), 0, GL_RGBA,
                         GL_UNSIGNED_BYTE, d.initial_data);
-        gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        const GLint filter =
+            static_cast<GLint>(d.filter == TextureFilter::Nearest ? GL_NEAREST : GL_LINEAR);
+        gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+        gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         gl().TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         TextureHandle h{m_next_handle++};
@@ -161,7 +163,8 @@ class GLDevice final : public IDevice {
 
         // The colour attachment is an ordinary texture, so everything that can
         // sample a texture can sample a target without special-casing it.
-        auto color = create_texture({.width = d.width, .height = d.height, .format = d.format});
+        auto color = create_texture(
+            {.width = d.width, .height = d.height, .format = d.format, .filter = d.filter});
         if (!color)
             return vaxelis::unexpected(color.error());
 

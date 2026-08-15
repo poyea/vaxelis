@@ -60,11 +60,23 @@ struct RenderTargetHandle {
 /// Pixel formats supported by create_texture().
 enum class TextureFormat { RGBA8 };
 
+/// How a texture is sampled when it is drawn at anything other than 1:1.
+enum class TextureFilter {
+    /// Blends neighbouring texels. Right for photographic art and for font
+    /// atlases, whose glyphs are antialiased already.
+    Linear,
+    /// Picks the nearest texel. Right for pixel art, and required for atlases:
+    /// Linear samples across a cell's edge and bleeds its neighbour into it.
+    Nearest,
+};
+
 /// Creation parameters for a 2D texture.
 struct TextureDesc {
     uint32_t width{0};
     uint32_t height{0};
     TextureFormat format{TextureFormat::RGBA8};
+    /// Defaults to Linear, which is wrong for pixel art; see TextureFilter.
+    TextureFilter filter{TextureFilter::Linear};
     const void* initial_data{nullptr}; ///< tightly packed; size = width*height*bpp
 };
 
@@ -83,6 +95,9 @@ struct RenderTargetDesc {
     uint32_t width{0};
     uint32_t height{0};
     TextureFormat format{TextureFormat::RGBA8};
+    /// Applied to the colour attachment. Nearest keeps an integer upscale of a
+    /// low-resolution target crisp.
+    TextureFilter filter{TextureFilter::Linear};
 };
 
 /// How a buffer will be bound.
