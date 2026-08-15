@@ -9,71 +9,19 @@
 
 #include <gtest/gtest.h>
 
+#include "RecordingDevice.hpp"
 #include "engine/renderer/SpriteRenderer.hpp"
-#include "engine/rhi/Rhi.hpp"
 
 using namespace vaxelis;
+using vaxelis::testing::RecordedVertex;
+using vaxelis::testing::RecordingDevice;
 
 namespace {
 
-/// Mirrors the vertex layout Rhi.hpp documents for draw_sprite_batch:
-/// interleaved position, uv and colour at a 32-byte stride.
-struct Vertex {
-    float x{0.0f};
-    float y{0.0f};
-    float u{0.0f};
-    float v{0.0f};
-    float r{0.0f};
-    float g{0.0f};
-    float b{0.0f};
-    float a{0.0f};
-};
-static_assert(sizeof(Vertex) == 32, "must match the RHI's documented sprite vertex layout");
-
-/// A device that keeps what the batcher submits instead of talking to a GPU, so
-/// the vertices SpriteBatch builds can be inspected on the CPU.
-class RecordingDevice final : public rhi::IDevice {
-  public:
-    std::vector<Vertex> vertices; ///< contents of the most recent update_buffer
-    int draw_calls{0};
-
-    expected<rhi::TextureHandle, rhi::RhiError> create_texture(const rhi::TextureDesc&) override {
-        return rhi::TextureHandle{++m_next_id};
-    }
-    expected<rhi::ShaderHandle, rhi::RhiError> create_shader(const rhi::ShaderDesc&) override {
-        return rhi::ShaderHandle{++m_next_id};
-    }
-    expected<rhi::BufferHandle, rhi::RhiError> create_buffer(const rhi::BufferDesc&) override {
-        return rhi::BufferHandle{++m_next_id};
-    }
-
-    void destroy(rhi::TextureHandle) override {}
-    void destroy(rhi::ShaderHandle) override {}
-    void destroy(rhi::BufferHandle) override {}
-
-    void update_buffer(rhi::BufferHandle, std::span<const std::byte> data, size_t) override {
-        vertices.resize(data.size() / sizeof(Vertex));
-        if (!data.empty())
-            std::memcpy(vertices.data(), data.data(), data.size());
-    }
-    void update_texture(rhi::TextureHandle, const rhi::TextureUpdate&) override {}
-
-    void begin_frame(vec4, uint32_t, uint32_t) override {}
-    void end_frame() override {}
-
-    void draw_sprite_batch(rhi::ShaderHandle, rhi::BufferHandle, rhi::BufferHandle, uint32_t,
-                           rhi::TextureHandle, const mat4&) override {
-        ++draw_calls;
-    }
-
-  private:
-    uint32_t m_next_id{0};
-};
-
 /// Corner lookup by exact position; quad corners are computed from halved
 /// extents, so the coordinates below are exact in binary floating point.
-const Vertex& vertex_at(const std::vector<Vertex>& verts, float x, float y) {
-    for (const Vertex& v : verts) {
+const RecordedVertex& vertex_at(const std::vector<RecordedVertex>& verts, float x, float y) {
+    for (const RecordedVertex& v : verts) {
         if (v.x == x && v.y == y)
             return v;
     }
@@ -120,8 +68,8 @@ TEST(SpriteBatch, SubRectMapsMinUvToTheTopLeftCorner) {
     batch.end();
 
     ASSERT_EQ(dev.vertices.size(), 4u);
-    const Vertex& top_left = vertex_at(dev.vertices, 40.0f, 40.0f);
-    const Vertex& bottom_right = vertex_at(dev.vertices, 60.0f, 60.0f);
+    const RecordedVertex& top_left = vertex_at(dev.vertices, 40.0f, 40.0f);
+    const RecordedVertex& bottom_right = vertex_at(dev.vertices, 60.0f, 60.0f);
     EXPECT_FLOAT_EQ(top_left.u, 0.25f);
     EXPECT_FLOAT_EQ(top_left.v, 0.0f);
     EXPECT_FLOAT_EQ(bottom_right.u, 0.75f);
@@ -141,7 +89,7 @@ TEST(SpriteBatch, VertexColorIsCarriedToEveryCorner) {
     batch.end();
 
     ASSERT_EQ(dev.vertices.size(), 4u);
-    for (const Vertex& v : dev.vertices) {
+    for (const RecordedVertex& v : dev.vertices) {
         EXPECT_FLOAT_EQ(v.r, 0.2f);
         EXPECT_FLOAT_EQ(v.g, 0.4f);
         EXPECT_FLOAT_EQ(v.b, 0.6f);

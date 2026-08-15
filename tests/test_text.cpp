@@ -9,53 +9,15 @@
 
 #include <gtest/gtest.h>
 
+#include "RecordingDevice.hpp"
 #include "engine/renderer/SpriteRenderer.hpp"
-#include "engine/rhi/Rhi.hpp"
 #include "engine/text/Font.hpp"
 
 using namespace vaxelis;
+using vaxelis::testing::RecordedVertex;
+using vaxelis::testing::RecordingDevice;
 
 namespace {
-
-struct Vertex {
-    float x, y, u, v, r, g, b, a;
-};
-
-/// Keeps whatever the batcher submits instead of touching a GPU. Same shape as
-/// the one in test_sprite_batch.
-class RecordingDevice final : public rhi::IDevice {
-  public:
-    std::vector<Vertex> vertices;
-    int draw_calls{0};
-
-    expected<rhi::TextureHandle, rhi::RhiError> create_texture(const rhi::TextureDesc&) override {
-        return rhi::TextureHandle{++m_next_id};
-    }
-    expected<rhi::ShaderHandle, rhi::RhiError> create_shader(const rhi::ShaderDesc&) override {
-        return rhi::ShaderHandle{++m_next_id};
-    }
-    expected<rhi::BufferHandle, rhi::RhiError> create_buffer(const rhi::BufferDesc&) override {
-        return rhi::BufferHandle{++m_next_id};
-    }
-    void destroy(rhi::TextureHandle) override {}
-    void destroy(rhi::ShaderHandle) override {}
-    void destroy(rhi::BufferHandle) override {}
-    void update_buffer(rhi::BufferHandle, std::span<const std::byte> data, size_t) override {
-        vertices.resize(data.size() / sizeof(Vertex));
-        if (!data.empty())
-            std::memcpy(vertices.data(), data.data(), data.size());
-    }
-    void update_texture(rhi::TextureHandle, const rhi::TextureUpdate&) override {}
-    void begin_frame(vec4, uint32_t, uint32_t) override {}
-    void end_frame() override {}
-    void draw_sprite_batch(rhi::ShaderHandle, rhi::BufferHandle, rhi::BufferHandle, uint32_t,
-                           rhi::TextureHandle, const mat4&) override {
-        ++draw_calls;
-    }
-
-  private:
-    uint32_t m_next_id{0};
-};
 
 /// Three glyphs starting at 'A', with deliberately distinct metrics: 'A' and
 /// 'B' draw, 'C' stands in for a space (advance but no quad).
@@ -139,7 +101,7 @@ TEST(Text, DrawPlacesGlyphsByTheirTopLeftCorner) {
     // pen(100,100) + offset(1,-12) is the top-left; the quad is 8x16 from there.
     float min_x = dev.vertices[0].x;
     float min_y = dev.vertices[0].y;
-    for (const Vertex& v : dev.vertices) {
+    for (const RecordedVertex& v : dev.vertices) {
         min_x = std::min(min_x, v.x);
         min_y = std::min(min_y, v.y);
     }
