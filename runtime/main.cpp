@@ -157,15 +157,15 @@ class Platformer final : public vaxelis::Application {
 
     void on_fixed_update(float dt) override {
         // Global controls that work in any state.
-        if (input().pressed("restart")) {
+        if (input().step_pressed("restart")) {
             load_level(m_current_level);
             return;
         }
-        if (m_state == GameState::LevelComplete && input().pressed("advance")) {
+        if (m_state == GameState::LevelComplete && input().step_pressed("advance")) {
             load_level(m_current_level + 1);
             return;
         }
-        if (m_state == GameState::Won && input().pressed("advance")) {
+        if (m_state == GameState::Won && input().step_pressed("advance")) {
             m_current_level = 1;
             load_level(1);
             return;
@@ -394,7 +394,7 @@ class Platformer final : public vaxelis::Application {
         b2Body_SetLinearVelocity(rb.body, b2Vec2{vx, v.y});
 
         // Jump: only when close to standing still vertically (rough ground-check).
-        if (input().pressed("jump") && std::abs(v.y) < 0.2f) {
+        if (input().step_pressed("jump") && std::abs(v.y) < 0.2f) {
             b2Body_ApplyLinearImpulseToCenter(rb.body, b2Vec2{0.0f, -65.0f / ppm}, true);
             play_cue("jump");
         }

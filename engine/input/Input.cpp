@@ -11,6 +11,49 @@ void Input::begin_frame() {
     m_prev = m_curr;
 }
 
+void Input::latch_edges() {
+    for (size_t i = 0; i < kNumKeys; ++i) {
+        // OR rather than assign: a press must survive frames that run no fixed
+        // step at all, which is most of them above 60Hz.
+        m_latched_pressed[i] = m_latched_pressed[i] || (m_curr[i] && !m_prev[i]);
+        m_latched_released[i] = m_latched_released[i] || (!m_curr[i] && m_prev[i]);
+    }
+}
+
+void Input::begin_fixed_step() {
+    m_step_pressed = m_latched_pressed;
+    m_step_released = m_latched_released;
+    m_latched_pressed.fill(false);
+    m_latched_released.fill(false);
+}
+
+bool Input::step_pressed(SDL_Scancode k) const {
+    auto i = static_cast<size_t>(k);
+    return i < kNumKeys && m_step_pressed[i];
+}
+bool Input::step_released(SDL_Scancode k) const {
+    auto i = static_cast<size_t>(k);
+    return i < kNumKeys && m_step_released[i];
+}
+bool Input::step_pressed(std::string_view name) const {
+    auto it = m_actions.find(name);
+    if (it == m_actions.end())
+        return false;
+    for (auto k : it->second.keys)
+        if (step_pressed(k))
+            return true;
+    return false;
+}
+bool Input::step_released(std::string_view name) const {
+    auto it = m_actions.find(name);
+    if (it == m_actions.end())
+        return false;
+    for (auto k : it->second.keys)
+        if (step_released(k))
+            return true;
+    return false;
+}
+
 void Input::on_event(const SDL_Event& ev) {
     if (ev.type == SDL_EVENT_KEY_DOWN || ev.type == SDL_EVENT_KEY_UP) {
         const auto sc = ev.key.scancode;

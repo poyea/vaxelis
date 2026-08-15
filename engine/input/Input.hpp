@@ -26,6 +26,14 @@ class Input {
   public:
     /// Snapshots key state for this frame's edge queries.
     void begin_frame();
+
+    /// Records the edges this frame produced so a fixed step can still see
+    /// them. Call once after event polling.
+    void latch_edges();
+
+    /// Hands the latched edges to one fixed step and clears them. Call before
+    /// each on_fixed_update.
+    void begin_fixed_step();
     /// Feeds one SDL event into the live key state.
     void on_event(const SDL_Event& ev);
 
@@ -48,6 +56,20 @@ class Input {
     /// Named-action variant of released().
     bool released(std::string_view name) const;
 
+    /// Edge queries for fixed-timestep code.
+    ///
+    /// pressed()/released() are scoped to the frame, which is wrong inside
+    /// on_fixed_update: that runs 0..N times per frame, so above 60Hz a press
+    /// can be cleared before any step observes it, and on a frame running two
+    /// steps the same press fires twice. These consume a latch instead, so one
+    /// press is seen exactly once by exactly one step.
+    bool step_pressed(SDL_Scancode) const;
+    bool step_released(SDL_Scancode) const;
+    /// Named-action variant of step_pressed().
+    bool step_pressed(std::string_view name) const;
+    /// Named-action variant of step_released().
+    bool step_released(std::string_view name) const;
+
   private:
     static constexpr size_t kNumKeys = SDL_SCANCODE_COUNT;
 
@@ -60,6 +82,11 @@ class Input {
     StringMap<Binding> m_actions;
     std::array<bool, kNumKeys> m_curr{};
     std::array<bool, kNumKeys> m_prev{};
+    // Edges awaiting a fixed step, and the set handed to the step running now.
+    std::array<bool, kNumKeys> m_latched_pressed{};
+    std::array<bool, kNumKeys> m_latched_released{};
+    std::array<bool, kNumKeys> m_step_pressed{};
+    std::array<bool, kNumKeys> m_step_released{};
 };
 
 } // namespace vaxelis

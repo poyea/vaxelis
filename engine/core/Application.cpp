@@ -122,6 +122,10 @@ void Application::step_frame() {
         }
     }
 
+    // Edges are latched here so a fixed step still sees a press made on a
+    // frame that ran no step.
+    m_input.latch_edges();
+
     float frame_dt = m_clock.tick();
     // Clamp absurd deltas (paused under debugger) to avoid huge accumulator.
     if (frame_dt > 0.25f)
@@ -133,6 +137,7 @@ void Application::step_frame() {
     m_accumulator += frame_dt;
     int steps = 0;
     while (m_accumulator >= kFixedDt && steps < kMaxStepsPerFrame) {
+        m_input.begin_fixed_step();
         on_fixed_update(kFixedDt);
         m_accumulator -= kFixedDt;
         ++steps;
