@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 #include "engine/rhi/Rhi.hpp"
@@ -39,6 +40,10 @@ class RecordingDevice final : public rhi::IDevice {
     std::vector<RecordedVertex> vertices;
     /// How many times draw_sprite_batch was called.
     int draw_calls{0};
+    /// Target currently bound; null means the backbuffer.
+    rhi::RenderTargetHandle bound_target{};
+    /// How many times set_render_target was called.
+    int target_binds{0};
 
     expected<rhi::TextureHandle, rhi::RhiError> create_texture(const rhi::TextureDesc&) override {
         return rhi::TextureHandle{++m_next_id};
@@ -50,6 +55,22 @@ class RecordingDevice final : public rhi::IDevice {
         return rhi::BufferHandle{++m_next_id};
     }
 
+    expected<rhi::RenderTargetHandle, rhi::RhiError>
+    create_render_target(const rhi::RenderTargetDesc&) override {
+        const rhi::RenderTargetHandle rt{++m_next_id};
+        m_target_textures[rt.id] = rhi::TextureHandle{++m_next_id};
+        return rt;
+    }
+    rhi::TextureHandle render_target_texture(rhi::RenderTargetHandle rt) const override {
+        const auto it = m_target_textures.find(rt.id);
+        return it != m_target_textures.end() ? it->second : rhi::TextureHandle{};
+    }
+    void set_render_target(rhi::RenderTargetHandle target, vec4) override {
+        bound_target = target;
+        ++target_binds;
+    }
+
+    void destroy(rhi::RenderTargetHandle rt) override { m_target_textures.erase(rt.id); }
     void destroy(rhi::TextureHandle) override {}
     void destroy(rhi::ShaderHandle) override {}
     void destroy(rhi::BufferHandle) override {}
@@ -71,6 +92,7 @@ class RecordingDevice final : public rhi::IDevice {
 
   private:
     uint32_t m_next_id{0};
+    std::unordered_map<uint32_t, rhi::TextureHandle> m_target_textures;
 };
 
 } // namespace vaxelis::testing

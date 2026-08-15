@@ -49,6 +49,14 @@ struct BufferHandle {
     constexpr bool valid() const { return id != 0; }
 };
 
+/// Opaque render-target handle. Trivially copyable, cheap to pass around. 0 == null.
+struct RenderTargetHandle {
+    uint32_t id{0};
+    /// False for a default-constructed (null) handle, which every call takes to
+    /// mean "the backbuffer". See TextureHandle::valid().
+    constexpr bool valid() const { return id != 0; }
+};
+
 /// Pixel formats supported by create_texture().
 enum class TextureFormat { RGBA8 };
 
@@ -68,6 +76,13 @@ struct TextureUpdate {
     uint32_t width{0};
     uint32_t height{0};
     const void* data{nullptr};
+};
+
+/// Creation parameters for an offscreen render target.
+struct RenderTargetDesc {
+    uint32_t width{0};
+    uint32_t height{0};
+    TextureFormat format{TextureFormat::RGBA8};
 };
 
 /// How a buffer will be bound.
@@ -116,6 +131,28 @@ class IDevice {
     /// Releases the buffer. See destroy(TextureHandle).
     virtual void destroy(BufferHandle) = 0;
 
+    /// Allocates an offscreen target and the colour texture backing it.
+    /// @return the new handle, or UnsupportedFormat / OutOfMemory on failure.
+    virtual vaxelis::expected<RenderTargetHandle, RhiError>
+    create_render_target(const RenderTargetDesc&) = 0;
+
+    /// Releases the target and the texture it owns, invalidating whatever
+    /// render_target_texture() previously returned for it.
+    virtual void destroy(RenderTargetHandle) = 0;
+
+    /// The colour attachment, samplable like any other texture. Null for an
+    /// unknown handle. The texture is owned by the target, so do not destroy it
+    /// separately.
+    virtual TextureHandle render_target_texture(RenderTargetHandle) const = 0;
+
+    /// Directs subsequent draws into `target`, clearing it to `clear_color`
+    /// first, and sets the viewport to the target's size.
+    ///
+    /// A null handle restores the backbuffer and its viewport *without*
+    /// clearing, so returning from an offscreen pass does not wipe the frame
+    /// drawn so far; `clear_color` is ignored in that case.
+    virtual void set_render_target(RenderTargetHandle target, vec4 clear_color) = 0;
+
     /// Uploads `data` into the buffer starting at `offset_bytes`.
     virtual void update_buffer(BufferHandle, std::span<const std::byte> data,
                                size_t offset_bytes = 0) = 0;
@@ -148,5 +185,6 @@ vaxelis::expected<std::unique_ptr<IDevice>, RhiError> create_device(Backend);
 static_assert(std::is_trivially_copyable_v<TextureHandle>);
 static_assert(std::is_trivially_copyable_v<ShaderHandle>);
 static_assert(std::is_trivially_copyable_v<BufferHandle>);
+static_assert(std::is_trivially_copyable_v<RenderTargetHandle>);
 
 } // namespace vaxelis::rhi
