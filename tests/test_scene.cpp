@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 John Law
 
+#include <algorithm>
+
 #include <gtest/gtest.h>
 
+#include "RecordingDevice.hpp"
+#include "engine/renderer/SpriteRenderer.hpp"
 #include "engine/scene/Components.hpp"
 #include "engine/scene/Scene.hpp"
 #include "engine/scene/SceneSerializer.hpp"
 
 using namespace vaxelis;
+using vaxelis::testing::RecordingDevice;
 
 TEST(Scene, CreateDestroyNodesAndHierarchy) {
     Scene s;
@@ -135,4 +140,73 @@ TEST(Scene, MergingTwoLoadsKeepsReferencesDistinct) {
     EXPECT_EQ(shared_nodes, 2);
     // The original uuid still resolves to exactly one node.
     EXPECT_TRUE(merged.registry().valid(merged.find_by_uuid(id)));
+}
+
+// A sprite's world matrix carries the rotation and scale of the entity and of
+// every ancestor, so render_sprites has to hand the batcher the whole matrix.
+// Reading only its translation column left the transform's other fields inert.
+TEST(Scene, RenderSpritesAppliesRotationAndScale) {
+    RecordingDevice dev;
+    SpriteBatch batch;
+    ASSERT_TRUE(batch.init(dev));
+    const auto tex = dev.create_texture({}).value_or(rhi::TextureHandle{});
+
+    Scene s;
+    const entt::entity e = s.create_node("Sprite");
+    auto& t = s.registry().get<Transform2D>(e);
+    t.position = {10.0f, 10.0f};
+    t.scale = {2.0f, 2.0f};
+    auto& sprite = s.registry().emplace<SpriteComponent>(e);
+    sprite.texture = tex;
+    sprite.size = {4.0f, 4.0f};
+
+    batch.begin(dev, 100, 100);
+    s.render_sprites(batch);
+    batch.end();
+
+    // 4x4 scaled 2x is 8x8 around (10, 10), not the 4x4 a translation-only
+    // read would produce.
+    ASSERT_EQ(dev.vertices.size(), 4u);
+    float min_x = dev.vertices[0].x, max_x = dev.vertices[0].x;
+    for (const auto& v : dev.vertices) {
+        min_x = std::min(min_x, v.x);
+        max_x = std::max(max_x, v.x);
+    }
+    EXPECT_FLOAT_EQ(min_x, 6.0f);
+    EXPECT_FLOAT_EQ(max_x, 14.0f);
+
+    batch.shutdown(dev);
+}
+
+TEST(Scene, RenderSpritesInheritsAParentsScale) {
+    RecordingDevice dev;
+    SpriteBatch batch;
+    ASSERT_TRUE(batch.init(dev));
+    const auto tex = dev.create_texture({}).value_or(rhi::TextureHandle{});
+
+    Scene s;
+    const entt::entity parent = s.create_node("Parent");
+    s.registry().get<Transform2D>(parent).scale = {3.0f, 3.0f};
+    const entt::entity child = s.create_node("Child", parent);
+    s.registry().get<Transform2D>(child).position = {2.0f, 0.0f};
+    auto& sprite = s.registry().emplace<SpriteComponent>(child);
+    sprite.texture = tex;
+    sprite.size = {2.0f, 2.0f};
+
+    batch.begin(dev, 100, 100);
+    s.render_sprites(batch);
+    batch.end();
+
+    // The parent scales the child's offset (2 -> 6) and its size (2 -> 6), so
+    // the quad spans x = 3..9.
+    ASSERT_EQ(dev.vertices.size(), 4u);
+    float min_x = dev.vertices[0].x, max_x = dev.vertices[0].x;
+    for (const auto& v : dev.vertices) {
+        min_x = std::min(min_x, v.x);
+        max_x = std::max(max_x, v.x);
+    }
+    EXPECT_FLOAT_EQ(min_x, 3.0f);
+    EXPECT_FLOAT_EQ(max_x, 9.0f);
+
+    batch.shutdown(dev);
 }

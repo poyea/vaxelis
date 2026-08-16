@@ -154,9 +154,10 @@ void Scene::render_sprites(SpriteBatch& batch) const {
     std::ranges::stable_sort(items, {}, [](const Item& i) { return std::pair{i.z, i.tex}; });
     for (const auto& it : items) {
         const auto& s = m_registry.get<const SpriteComponent>(it.e);
+        // The whole world matrix, not just its translation column: a sprite
+        // inherits the rotation and scale of every ancestor as well as its own.
         const auto& w = m_registry.get<WorldTransform2D>(it.e).matrix;
-        const vec2 pos{w[3].x, w[3].y};
-        batch.draw(s.texture, pos, s.size, s.uv_rect, s.color);
+        batch.draw(s.texture, w, s.size, s.uv_rect, s.color);
     }
 }
 
