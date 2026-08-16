@@ -48,7 +48,7 @@ LoadedImage load_rgba8(const std::string& path) {
 bool AssetCache::init(rhi::IDevice& device, FileWatcher* watcher) {
     m_device = &device;
     AssetRegistry<TextureAsset>::Ops ops;
-    ops.load = [this](const std::string& path) { return create(path); };
+    ops.load = [this](const std::string& path) { return create(path, m_loading_filter); };
     ops.reload = [this](const std::string& path, TextureAsset& tex) { return refresh(path, tex); };
     ops.destroy = [this](TextureAsset tex) { m_device->destroy(tex.handle); };
     m_textures.init(std::move(ops), watcher);
@@ -60,8 +60,16 @@ void AssetCache::shutdown() {
     m_device = nullptr;
 }
 
-rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_view key) {
-    return m_textures.load(path, key).handle;
+rhi::TextureHandle AssetCache::load_texture(std::string_view path, std::string_view key,
+                                            rhi::TextureFilter filter) {
+    m_loading_filter = filter;
+    const TextureAsset tex = m_textures.load(path, key);
+    // A key that was already bound comes back as-is, filter included. Say so
+    // rather than let the caller believe the one it passed took effect.
+    if (tex.valid() && tex.filter != filter)
+        VX_WARN("AssetCache: '{}' is already loaded with a different filter; keeping that one",
+                key.empty() ? path : key);
+    return tex.handle;
 }
 
 rhi::TextureHandle AssetCache::get_texture(std::string_view key) const {
@@ -81,7 +89,7 @@ void AssetCache::add_listener(ReloadListener l) {
         [cb = std::move(l)](std::string_view key, TextureAsset tex) { cb(key, tex.handle); });
 }
 
-TextureAsset AssetCache::create(const std::string& path) {
+TextureAsset AssetCache::create(const std::string& path, rhi::TextureFilter filter) {
     if (!m_device)
         return {};
     auto img = load_rgba8(path);
@@ -94,12 +102,13 @@ TextureAsset AssetCache::create(const std::string& path) {
         .width = w,
         .height = h,
         .format = rhi::TextureFormat::RGBA8,
+        .filter = filter,
         .initial_data = img.px.data(),
     };
     auto tex = m_device->create_texture(td);
     if (!tex)
         return {};
-    return TextureAsset{.handle = *tex, .width = w, .height = h};
+    return TextureAsset{.handle = *tex, .width = w, .height = h, .filter = filter};
 }
 
 bool AssetCache::refresh(const std::string& path, TextureAsset& tex) {
@@ -132,14 +141,20 @@ bool AssetCache::refresh(const std::string& path, TextureAsset& tex) {
     // the new handle -- including when creation failed and it is now null.
     if (tex.handle.valid())
         m_device->destroy(tex.handle);
+    // Read the filter off before the assignment below overwrites `tex`: the
+    // replacement has to be sampled the way the original load asked for, not the
+    // way a fresh default would.
+    const rhi::TextureFilter filter = tex.filter;
     rhi::TextureDesc td{
         .width = w,
         .height = h,
         .format = rhi::TextureFormat::RGBA8,
+        .filter = filter,
         .initial_data = img.px.data(),
     };
     auto fresh = m_device->create_texture(td);
-    tex = fresh ? TextureAsset{.handle = *fresh, .width = w, .height = h} : TextureAsset{};
+    tex = fresh ? TextureAsset{.handle = *fresh, .width = w, .height = h, .filter = filter}
+                : TextureAsset{};
     VX_INFO("AssetCache: reloaded texture '{}'", path);
     return true;
 }

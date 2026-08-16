@@ -19,6 +19,10 @@ struct TextureAsset {
     rhi::TextureHandle handle{};
     uint32_t width{0};
     uint32_t height{0};
+    /// Filter this texture was created with, remembered so a reload that has to
+    /// recreate it asks for the same one. Only meaningful for textures the cache
+    /// made itself; an adopted texture was sampled however its creator chose.
+    rhi::TextureFilter filter{rhi::TextureFilter::Linear};
 
     /// True once the texture exists on the GPU.
     constexpr bool valid() const { return handle.valid(); }
@@ -43,7 +47,14 @@ class AssetCache {
     void shutdown();
 
     /// Loads or returns cached. `key` defaults to `path` if empty.
-    rhi::TextureHandle load_texture(std::string_view path, std::string_view key = {});
+    ///
+    /// `filter` decides how the texture is sampled and belongs to the key from
+    /// here on: a reload that recreates the texture asks for it again, so hot
+    /// reload cannot quietly drop pixel art back to Linear. It applies only to
+    /// the call that creates the asset -- a later call for a key already bound
+    /// returns what is cached, and warns if it wanted something else.
+    rhi::TextureHandle load_texture(std::string_view path, std::string_view key = {},
+                                    rhi::TextureFilter filter = rhi::TextureFilter::Linear);
 
     /// Lookup without loading.
     rhi::TextureHandle get_texture(std::string_view key) const;
@@ -60,11 +71,15 @@ class AssetCache {
     void add_listener(ReloadListener l);
 
   private:
-    TextureAsset create(const std::string& path);
+    TextureAsset create(const std::string& path, rhi::TextureFilter filter);
     bool refresh(const std::string& path, TextureAsset& tex);
 
     rhi::IDevice* m_device{nullptr};
     AssetRegistry<TextureAsset> m_textures;
+    /// Filter for the load currently in flight. The registry runs the loader
+    /// synchronously from load(), so the only reader is the create() call this
+    /// was set for; nothing else reaches the loader.
+    rhi::TextureFilter m_loading_filter{rhi::TextureFilter::Linear};
 };
 
 } // namespace vaxelis

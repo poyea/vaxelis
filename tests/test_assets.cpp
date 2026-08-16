@@ -2,14 +2,19 @@
 // Copyright (c) 2026 John Law
 
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "RecordingDevice.hpp"
+#include "engine/assets/AssetCache.hpp"
 #include "engine/assets/AssetRegistry.hpp"
 
 using namespace vaxelis;
+using vaxelis::testing::RecordingDevice;
 
 namespace {
 
@@ -184,4 +189,160 @@ TEST(AssetRegistry, ReloadingAnUnknownKeyDoesNothing) {
 
     EXPECT_EQ(b.reloads, 0);
     EXPECT_EQ(notifications, 0);
+}
+
+namespace {
+
+/// The smallest image stb_image will decode without a compressor behind it: an
+/// uncompressed 32-bit TGA. 18-byte header, then w*h BGRA pixels. Written
+/// binary, so the 0x0A bytes in it survive on Windows.
+void write_tga(const std::filesystem::path& path, uint16_t w, uint16_t h) {
+    // offset, colour-map type, image type 2 (uncompressed true colour), then
+    // the colour-map spec and x/y origin, all zero.
+    std::vector<uint8_t> bytes = {0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    bytes.push_back(static_cast<uint8_t>(w & 0xFF));
+    bytes.push_back(static_cast<uint8_t>(w >> 8));
+    bytes.push_back(static_cast<uint8_t>(h & 0xFF));
+    bytes.push_back(static_cast<uint8_t>(h >> 8));
+    bytes.push_back(32);   // bits per pixel
+    bytes.push_back(0x28); // top-left origin, 8 alpha bits
+    bytes.resize(bytes.size() + static_cast<size_t>(w) * h * 4, 0xFF);
+
+    std::ofstream f(path, std::ios::binary);
+    f.write(reinterpret_cast<const char*>(bytes.data()),
+            static_cast<std::streamsize>(bytes.size()));
+}
+
+/// One scratch directory per test, because ctest may run them concurrently in
+/// separate processes and a shared name would have them fighting over one file.
+class AssetCacheTest : public ::testing::Test {
+  protected:
+    void SetUp() override {
+        const auto* info = ::testing::UnitTest::GetInstance()->current_test_info();
+        m_dir =
+            std::filesystem::temp_directory_path() / ("vaxelis_ac_" + std::string(info->name()));
+        std::filesystem::remove_all(m_dir);
+        std::filesystem::create_directories(m_dir);
+        m_file = m_dir / "pixels.tga";
+    }
+    void TearDown() override { std::filesystem::remove_all(m_dir); }
+
+    std::string path() const { return m_file.string(); }
+
+    std::filesystem::path m_dir;
+    std::filesystem::path m_file;
+};
+
+} // namespace
+
+TEST_F(AssetCacheTest, TheRequestedFilterReachesTheDevice) {
+    write_tga(m_file, 4, 4);
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+
+    ASSERT_TRUE(cache.load_texture(path(), "art", rhi::TextureFilter::Nearest).valid());
+    ASSERT_EQ(dev.textures.size(), 1u);
+    EXPECT_EQ(dev.textures[0].width, 4u);
+    EXPECT_EQ(dev.textures[0].height, 4u);
+    EXPECT_EQ(dev.textures[0].filter, rhi::TextureFilter::Nearest);
+
+    cache.shutdown();
+}
+
+TEST_F(AssetCacheTest, TheDefaultFilterIsLinear) {
+    write_tga(m_file, 2, 2);
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+
+    ASSERT_TRUE(cache.load_texture(path()).valid());
+    ASSERT_EQ(dev.textures.size(), 1u);
+    EXPECT_EQ(dev.textures[0].filter, rhi::TextureFilter::Linear);
+
+    cache.shutdown();
+}
+
+TEST_F(AssetCacheTest, ARecreatingReloadAsksForTheSameFilterAgain) {
+    write_tga(m_file, 4, 4);
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+    ASSERT_TRUE(cache.load_texture(path(), "art", rhi::TextureFilter::Nearest).valid());
+
+    // A size change is what forces the destroy-and-recreate path. Before the
+    // filter was remembered, the replacement silently came back Linear.
+    write_tga(m_file, 8, 8);
+    cache.reload_texture("art");
+
+    ASSERT_EQ(dev.textures.size(), 2u);
+    EXPECT_EQ(dev.textures[1].width, 8u);
+    EXPECT_EQ(dev.textures[1].filter, rhi::TextureFilter::Nearest);
+
+    cache.shutdown();
+}
+
+TEST_F(AssetCacheTest, ASameSizeReloadUploadsInPlaceAndCreatesNothing) {
+    write_tga(m_file, 4, 4);
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+    const auto original = cache.load_texture(path(), "art", rhi::TextureFilter::Nearest);
+
+    write_tga(m_file, 4, 4);
+    cache.reload_texture("art");
+
+    // Nothing was recreated, so there was no filter to get wrong, and the
+    // handle callers hold is still the live one.
+    EXPECT_EQ(dev.textures.size(), 1u);
+    EXPECT_EQ(dev.texture_updates, 1);
+    EXPECT_EQ(cache.get_texture("art").id, original.id);
+
+    cache.shutdown();
+}
+
+TEST_F(AssetCacheTest, ASecondLoadOfABoundKeyKeepsTheFilterItAlreadyHas) {
+    write_tga(m_file, 4, 4);
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+    const auto first = cache.load_texture(path(), "art", rhi::TextureFilter::Nearest);
+
+    // The key is already bound, so this returns what is cached rather than
+    // reloading it under a different filter.
+    const auto again = cache.load_texture(path(), "art", rhi::TextureFilter::Linear);
+    EXPECT_EQ(again.id, first.id);
+    EXPECT_EQ(dev.textures.size(), 1u);
+    EXPECT_EQ(dev.textures[0].filter, rhi::TextureFilter::Nearest);
+
+    cache.shutdown();
+}
+
+TEST_F(AssetCacheTest, TwoKeysOverOneFileCanBeSampledDifferently) {
+    write_tga(m_file, 4, 4);
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+
+    const auto crisp = cache.load_texture(path(), "crisp", rhi::TextureFilter::Nearest);
+    const auto smooth = cache.load_texture(path(), "smooth", rhi::TextureFilter::Linear);
+
+    EXPECT_NE(crisp.id, smooth.id);
+    ASSERT_EQ(dev.textures.size(), 2u);
+    EXPECT_EQ(dev.textures[0].filter, rhi::TextureFilter::Nearest);
+    EXPECT_EQ(dev.textures[1].filter, rhi::TextureFilter::Linear);
+
+    cache.shutdown();
+}
+
+TEST_F(AssetCacheTest, AMissingFileLoadsNothingAndBindsNoKey) {
+    RecordingDevice dev;
+    AssetCache cache;
+    ASSERT_TRUE(cache.init(dev));
+
+    EXPECT_FALSE(cache.load_texture(path(), "art", rhi::TextureFilter::Nearest).valid());
+    EXPECT_TRUE(dev.textures.empty());
+    EXPECT_FALSE(cache.get_texture("art").valid());
+
+    cache.shutdown();
 }
