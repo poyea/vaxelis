@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <cassert>
+
 #include "engine/math/Math.hpp"
 
 namespace vaxelis {
@@ -11,6 +13,9 @@ namespace vaxelis {
 /// `zoom` > 1 magnifies. Y-down to match the rest of the renderer.
 struct Camera2D {
     vec2 position{0.0f, 0.0f};
+    /// Must stay above zero: everything here divides by it, so zero gives an
+    /// infinite view and a projection of NaN, and a negative value mirrors the
+    /// world instead of scaling it.
     float zoom{1.0f};
 
     /// Optional world-space clamp; if both extents are zero, no clamping.
@@ -21,6 +26,7 @@ struct Camera2D {
     /// World-space rect the camera covers at this framebuffer size, in pixels.
     /// Useful for culling; `min` is the top-left corner (y-down).
     AABB2 visible_bounds(uint32_t screen_w, uint32_t screen_h) const {
+        assert(zoom > 0.0f && "Camera2D::zoom must be positive");
         const float hw = (static_cast<float>(screen_w) * 0.5f) / zoom;
         const float hh = (static_cast<float>(screen_h) * 0.5f) / zoom;
         return {{position.x - hw, position.y - hh}, {position.x + hw, position.y + hh}};
@@ -37,6 +43,7 @@ struct Camera2D {
     /// bounds_max]. An axis whose bounded extent is smaller than the view is
     /// centered on the bounds instead. No-op when bounds are degenerate.
     void apply_bounds(uint32_t screen_w, uint32_t screen_h) {
+        assert(zoom > 0.0f && "Camera2D::zoom must be positive");
         if (bounds_min == bounds_max)
             return;
         const float hw = (static_cast<float>(screen_w) * 0.5f) / zoom;
