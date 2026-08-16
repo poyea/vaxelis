@@ -146,9 +146,11 @@ class Platformer final : public vaxelis::Application {
             m_camera.position += (t.position - m_camera.position) * follow;
         }
         // Levels are single-screen; zoom so the level fills the framebuffer,
-        // which tracks the window (and on web, the browser viewport).
+        // which tracks the window (and on web, the browser viewport). A
+        // minimised window reports 0x0, and a zoom of zero is an infinite view
+        // and a projection of NaN, so hold the last good one until it comes back.
         const vaxelis::vec2 world = m_map.world_size();
-        if (world.x > 0.0f && world.y > 0.0f) {
+        if (world.x > 0.0f && world.y > 0.0f && width() > 0 && height() > 0) {
             m_camera.zoom = std::min(static_cast<float>(width()) / world.x,
                                      static_cast<float>(height()) / world.y);
         }
