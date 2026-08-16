@@ -43,6 +43,26 @@ TEST(Animation, FramesSpanTheGridInReadingOrder) {
     EXPECT_FLOAT_EQ(frames[3].z, 1.0f);
 }
 
+TEST(Animation, AtlasSizeInsetsEachFrameByHalfATexel) {
+    // A 2x2 grid on a 64x64 sheet: each cell is 32 texels, so half a texel is
+    // 0.5/64 of the sheet. Without it frame 0's max_u and frame 1's min_u are
+    // both exactly 0.5 and a sample on the seam can come from either frame.
+    const auto frames = animation_frames(2, 2, 0, 64, 64);
+    ASSERT_EQ(frames.size(), 4u);
+    EXPECT_FLOAT_EQ(frames[0].x, 0.5f / 64.0f);
+    EXPECT_FLOAT_EQ(frames[0].z, 31.5f / 64.0f);
+    EXPECT_FLOAT_EQ(frames[1].x, 32.5f / 64.0f);
+    EXPECT_FLOAT_EQ(frames[3].z, 63.5f / 64.0f);
+
+    // The two halves of the seam no longer touch.
+    EXPECT_LT(frames[0].z, frames[1].x);
+
+    // A zero size means "unknown", and an unknown size cannot be inset.
+    const auto plain = animation_frames(2, 2, 0, 0, 64);
+    EXPECT_FLOAT_EQ(plain[0].x, 0.0f);
+    EXPECT_FLOAT_EQ(plain[0].y, 0.5f / 64.0f);
+}
+
 TEST(Animation, FrameCountCanStopShortOfTheGrid) {
     // A 4x2 sheet whose last two cells are blank.
     EXPECT_EQ(animation_frames(4, 2, 6).size(), 6u);

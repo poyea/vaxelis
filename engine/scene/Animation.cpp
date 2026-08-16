@@ -10,7 +10,8 @@
 
 namespace vaxelis {
 
-std::vector<vec4> animation_frames(uint32_t columns, uint32_t rows, uint32_t count) {
+std::vector<vec4> animation_frames(uint32_t columns, uint32_t rows, uint32_t count,
+                                   uint32_t texture_width, uint32_t texture_height) {
     std::vector<vec4> frames;
     if (columns == 0 || rows == 0)
         return frames;
@@ -18,11 +19,15 @@ std::vector<vec4> animation_frames(uint32_t columns, uint32_t rows, uint32_t cou
     const uint32_t total = count == 0 ? columns * rows : std::min(count, columns * rows);
     const float du = 1.0f / static_cast<float>(columns);
     const float dv = 1.0f / static_cast<float>(rows);
+    // See the header: without the atlas size there is nothing to inset by.
+    const float iu = texture_width > 0 ? 0.5f / static_cast<float>(texture_width) : 0.0f;
+    const float iv = texture_height > 0 ? 0.5f / static_cast<float>(texture_height) : 0.0f;
     frames.reserve(total);
     for (uint32_t i = 0; i < total; ++i) {
         const auto col = static_cast<float>(i % columns);
         const auto row = static_cast<float>(i / columns);
-        frames.push_back({col * du, row * dv, (col + 1.0f) * du, (row + 1.0f) * dv});
+        frames.push_back(
+            {col * du + iu, row * dv + iv, (col + 1.0f) * du - iu, (row + 1.0f) * dv - iv});
     }
     return frames;
 }
