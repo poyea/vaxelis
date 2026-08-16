@@ -38,7 +38,7 @@ int tileset_index_for_gid(const TiledMap& m, uint32_t gid) {
 // A tileset can only produce UVs with a positive column count and image extent;
 // anything else would divide by zero.
 bool tileset_drawable(const TilesetRef& ts) {
-    return ts.columns > 0 && ts.image_w > 0 && ts.image_h > 0;
+    return ts.columns > 0 && ts.image_w > 0 && ts.image_h > 0 && ts.tile_w > 0 && ts.tile_h > 0;
 }
 
 // floor(v) as an int, saturated to [lo, hi]. Saturating also tames the inf/NaN
@@ -254,10 +254,17 @@ void build_cache(TiledMap& m, int chunk_tiles) {
                 const int row = static_cast<int>(local / ts.columns);
                 const float iw = static_cast<float>(ts.image_w);
                 const float ih = static_cast<float>(ts.image_h);
-                const float u0 = static_cast<float>(col * ts.tile_w) / iw;
-                const float v0 = static_cast<float>(row * ts.tile_h) / ih;
-                const float u1 = static_cast<float>((col + 1) * ts.tile_w) / iw;
-                const float v1 = static_cast<float>((row + 1) * ts.tile_h) / ih;
+                // Half-texel inset. A cell's edge is shared with its
+                // neighbour, so a sample landing exactly on the boundary picks
+                // the neighbour up: certain under Linear filtering, and still
+                // possible under Nearest once the camera zoom is fractional.
+                // A one-texel tile collapses to that texel's centre, which is
+                // the right answer for it.
+                constexpr float kInset = 0.5f;
+                const float u0 = (static_cast<float>(col * ts.tile_w) + kInset) / iw;
+                const float v0 = (static_cast<float>(row * ts.tile_h) + kInset) / ih;
+                const float u1 = (static_cast<float>((col + 1) * ts.tile_w) - kInset) / iw;
+                const float v1 = (static_cast<float>((row + 1) * ts.tile_h) - kInset) / ih;
                 const vec2 pos{(static_cast<float>(x) + 0.5f) * tile_size.x,
                                (static_cast<float>(y) + 0.5f) * tile_size.y};
                 const size_t bucket = static_cast<size_t>(slot) * chunk_count + chunk_of(x, y);

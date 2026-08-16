@@ -94,14 +94,57 @@ TEST(TiledMap, LoadBuildsAChunkedDrawCache) {
     EXPECT_EQ(cache.batches[0].runs[0].count, 4u);
 
     // First quad is gid 1 at cell (1,0): centered in its cell, sampling the
-    // top-left tile of a 2x2 atlas as (min_u, min_v, max_u, max_v).
+    // top-left tile of a 2x2 atlas as (min_u, min_v, max_u, max_v). The rect is
+    // inset by half a texel of the 32x32 atlas so it stops short of the edge it
+    // shares with the neighbouring tile: 0.5/32 in, 15.5/32 out.
     const auto& q = cache.quads[0];
     EXPECT_FLOAT_EQ(q.pos.x, 24.0f);
     EXPECT_FLOAT_EQ(q.pos.y, 8.0f);
-    EXPECT_FLOAT_EQ(q.uv.x, 0.0f);
-    EXPECT_FLOAT_EQ(q.uv.y, 0.0f);
-    EXPECT_FLOAT_EQ(q.uv.z, 0.5f);
-    EXPECT_FLOAT_EQ(q.uv.w, 0.5f);
+    EXPECT_FLOAT_EQ(q.uv.x, 0.015625f);
+    EXPECT_FLOAT_EQ(q.uv.y, 0.015625f);
+    EXPECT_FLOAT_EQ(q.uv.z, 0.484375f);
+    EXPECT_FLOAT_EQ(q.uv.w, 0.484375f);
+}
+
+TEST(TiledMap, TileUvsStopShortOfTheEdgeSharedWithTheNextTile) {
+    // Two 16px tiles side by side in a 32x16 atlas. Tile 0's max_u and tile 1's
+    // min_u would both be exactly 0.5 without the inset, so a sample on that
+    // boundary could land in either tile.
+    constexpr const char* kJson = R"({
+        "width": 2, "height": 1, "tilewidth": 16, "tileheight": 16,
+        "tilesets": [{"firstgid":1,"image":"a","imagewidth":32,"imageheight":16,"tilewidth":16,"tileheight":16,"columns":2}],
+        "layers": [{"type":"tilelayer","name":"l","width":2,"height":1,"data":[1,2]}]
+    })";
+    TiledMap m;
+    ASSERT_TRUE(
+        tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{1}; }));
+    ASSERT_EQ(m.tile_layers.size(), 1u);
+    const auto& quads = m.tile_layers[0].cache.quads;
+    ASSERT_EQ(quads.size(), 2u);
+
+    EXPECT_LT(quads[0].uv.z, 0.5f); // left tile stops before the seam
+    EXPECT_GT(quads[1].uv.x, 0.5f); // right tile starts after it
+    EXPECT_FLOAT_EQ(quads[0].uv.z, 15.5f / 32.0f);
+    EXPECT_FLOAT_EQ(quads[1].uv.x, 16.5f / 32.0f);
+    // The outer edges pull in as well; the atlas has no neighbour there, but a
+    // uniform inset keeps every tile the same sampled size.
+    EXPECT_FLOAT_EQ(quads[0].uv.x, 0.5f / 32.0f);
+    EXPECT_FLOAT_EQ(quads[1].uv.z, 31.5f / 32.0f);
+}
+
+TEST(TiledMap, ATilesetWithNoUsableGeometryProducesNoQuads) {
+    // tilewidth 0 makes every derived uv meaningless, and would invert the
+    // half-texel inset into a rect whose min exceeds its max.
+    constexpr const char* kJson = R"({
+        "width": 1, "height": 1, "tilewidth": 16, "tileheight": 16,
+        "tilesets": [{"firstgid":1,"image":"a","imagewidth":16,"imageheight":16,"tilewidth":0,"tileheight":0,"columns":1}],
+        "layers": [{"type":"tilelayer","name":"l","width":1,"height":1,"data":[1]}]
+    })";
+    TiledMap m;
+    ASSERT_TRUE(
+        tiled::load_string(m, kJson, [](const std::string&) { return rhi::TextureHandle{1}; }));
+    ASSERT_EQ(m.tile_layers.size(), 1u);
+    EXPECT_TRUE(m.tile_layers[0].cache.quads.empty());
 }
 
 TEST(TiledMap, TilesAreBucketedPerChunk) {
