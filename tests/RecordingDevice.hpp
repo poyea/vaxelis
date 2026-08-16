@@ -32,12 +32,26 @@ struct RecordedVertex {
 };
 static_assert(sizeof(RecordedVertex) == 32, "must match the RHI's sprite vertex layout");
 
+/// What a create_texture call asked for, minus `initial_data`: those pixels do
+/// not outlive the call, so keeping the pointer would only invite a dangling
+/// read from a test.
+struct RecordedTexture {
+    uint32_t width{0};
+    uint32_t height{0};
+    rhi::TextureFormat format{rhi::TextureFormat::RGBA8};
+    rhi::TextureFilter filter{rhi::TextureFilter::Linear};
+};
+
 /// Records buffer uploads and draw calls. Handles are handed out in sequence
 /// and never point at anything real.
 class RecordingDevice final : public rhi::IDevice {
   public:
     /// Contents of the most recent update_buffer.
     std::vector<RecordedVertex> vertices;
+    /// Every create_texture request, in call order.
+    std::vector<RecordedTexture> textures;
+    /// How many times update_texture was called (an in-place pixel upload).
+    int texture_updates{0};
     /// How many times draw_sprite_batch was called.
     int draw_calls{0};
     /// Target currently bound; null means the backbuffer.
@@ -45,7 +59,9 @@ class RecordingDevice final : public rhi::IDevice {
     /// How many times set_render_target was called.
     int target_binds{0};
 
-    expected<rhi::TextureHandle, rhi::RhiError> create_texture(const rhi::TextureDesc&) override {
+    expected<rhi::TextureHandle, rhi::RhiError>
+    create_texture(const rhi::TextureDesc& desc) override {
+        textures.push_back({desc.width, desc.height, desc.format, desc.filter});
         return rhi::TextureHandle{++m_next_id};
     }
     expected<rhi::ShaderHandle, rhi::RhiError> create_shader(const rhi::ShaderDesc&) override {
@@ -80,7 +96,9 @@ class RecordingDevice final : public rhi::IDevice {
         if (!data.empty())
             std::memcpy(vertices.data(), data.data(), data.size());
     }
-    void update_texture(rhi::TextureHandle, const rhi::TextureUpdate&) override {}
+    void update_texture(rhi::TextureHandle, const rhi::TextureUpdate&) override {
+        ++texture_updates;
+    }
 
     void begin_frame(vec4, uint32_t, uint32_t) override {}
     void end_frame() override {}
