@@ -63,6 +63,24 @@ TEST(Animation, AtlasSizeInsetsEachFrameByHalfATexel) {
     EXPECT_FLOAT_EQ(plain[0].y, 0.5f / 64.0f);
 }
 
+TEST(Animation, ACellSmallerThanTwoTexelsCollapsesInsteadOfInverting) {
+    // Exactly one texel per cell: the inset reaches the centre from both sides,
+    // so the frame is that single texel's centre.
+    const auto tight = animation_frames(4, 1, 0, 4, 1);
+    ASSERT_EQ(tight.size(), 4u);
+    EXPECT_FLOAT_EQ(tight[0].x, tight[0].z);
+    EXPECT_FLOAT_EQ(tight[0].x, 0.5f / 4.0f);
+
+    // More cells than texels is nonsense, but a plain half-texel inset would
+    // reach past the centre and hand back a rect with min above max.
+    const auto absurd = animation_frames(8, 1, 0, 4, 1);
+    ASSERT_EQ(absurd.size(), 8u);
+    for (const vec4& f : absurd) {
+        EXPECT_LE(f.x, f.z);
+        EXPECT_LE(f.y, f.w);
+    }
+}
+
 TEST(Animation, FrameCountCanStopShortOfTheGrid) {
     // A 4x2 sheet whose last two cells are blank.
     EXPECT_EQ(animation_frames(4, 2, 6).size(), 6u);

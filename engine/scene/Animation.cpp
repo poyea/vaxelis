@@ -19,9 +19,14 @@ std::vector<vec4> animation_frames(uint32_t columns, uint32_t rows, uint32_t cou
     const uint32_t total = count == 0 ? columns * rows : std::min(count, columns * rows);
     const float du = 1.0f / static_cast<float>(columns);
     const float dv = 1.0f / static_cast<float>(rows);
-    // See the header: without the atlas size there is nothing to inset by.
-    const float iu = texture_width > 0 ? 0.5f / static_cast<float>(texture_width) : 0.0f;
-    const float iv = texture_height > 0 ? 0.5f / static_cast<float>(texture_height) : 0.0f;
+    // Half a texel, but never more than half the cell. Without the atlas size
+    // there is nothing to inset by; with more cells than texels the plain half
+    // texel would reach past the cell's own centre and inverted the rect, so
+    // clamping collapses it to that centre the way a one-texel cell already did.
+    const float iu =
+        texture_width > 0 ? std::min(0.5f / static_cast<float>(texture_width), 0.5f * du) : 0.0f;
+    const float iv =
+        texture_height > 0 ? std::min(0.5f / static_cast<float>(texture_height), 0.5f * dv) : 0.0f;
     frames.reserve(total);
     for (uint32_t i = 0; i < total; ++i) {
         const auto col = static_cast<float>(i % columns);

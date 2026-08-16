@@ -59,7 +59,8 @@ struct AnimationComponent {
 /// Pass the atlas size in pixels to inset each frame by half a texel. Without
 /// it the frames meet exactly on shared cell edges, where a sample can pick up
 /// the neighbouring frame. Sizes of zero skip the inset, which is only right
-/// when the grid is the whole texture.
+/// when the grid is the whole texture. A cell smaller than two texels collapses
+/// to its centre rather than inverting.
 std::vector<vec4> animation_frames(uint32_t columns, uint32_t rows, uint32_t count = 0,
                                    uint32_t texture_width = 0, uint32_t texture_height = 0);
 
