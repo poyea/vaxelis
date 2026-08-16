@@ -65,7 +65,11 @@ BakedFont bake(std::span<const std::byte> ttf, float pixel_height, uint32_t firs
     const int edge = static_cast<int>(atlas_size);
     const int first = static_cast<int>(first_codepoint);
     const int n = static_cast<int>(count);
-    const int rows = stbtt_BakeFontBitmap(data, 0, pixel_height, bmp, edge, edge, first, n, chars);
+    // Same `offset` stbtt_InitFont was given. Passing 0 here is only right for a
+    // plain .ttf; inside a .ttc collection it hands the bake the collection
+    // header instead of a font, which fails and blames the atlas size for it.
+    const int rows =
+        stbtt_BakeFontBitmap(data, offset, pixel_height, bmp, edge, edge, first, n, chars);
     if (rows <= 0) {
         VX_ERROR("Font: {} glyphs at {}px do not fit a {}x{} atlas", count, pixel_height,
                  atlas_size, atlas_size);
