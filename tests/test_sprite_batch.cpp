@@ -78,6 +78,91 @@ TEST(SpriteBatch, SubRectMapsMinUvToTheTopLeftCorner) {
     batch.shutdown(dev);
 }
 
+// The matrix overload exists so a sprite is not stuck axis-aligned. Both cases
+// below use exactly representable matrices, so the corners are exact.
+TEST(SpriteBatch, TransformScaleWidensTheQuadAroundItsOrigin) {
+    RecordingDevice dev;
+    SpriteBatch batch;
+    ASSERT_TRUE(batch.init(dev));
+    const auto tex = dev.create_texture({}).value_or(rhi::TextureHandle{});
+
+    mat4 m(1.0f);
+    m[0] = vec4(2.0f, 0.0f, 0.0f, 0.0f); // x scaled 2x
+    m[1] = vec4(0.0f, 3.0f, 0.0f, 0.0f); // y scaled 3x
+    m[3] = vec4(10.0f, 20.0f, 0.0f, 1.0f);
+
+    batch.begin(dev, 100, 100);
+    batch.draw(tex, m, {4.0f, 4.0f}, vec4{0.0f, 0.0f, 1.0f, 1.0f}, vec4{1.0f});
+    batch.end();
+
+    // A 4x4 quad becomes 8x12, still centered on the transform's origin.
+    ASSERT_EQ(dev.vertices.size(), 4u);
+    EXPECT_FLOAT_EQ(vertex_at(dev.vertices, 6.0f, 14.0f).u, 0.0f);  // top-left
+    EXPECT_FLOAT_EQ(vertex_at(dev.vertices, 14.0f, 26.0f).u, 1.0f); // bottom-right
+    EXPECT_FLOAT_EQ(vertex_at(dev.vertices, 14.0f, 26.0f).v, 1.0f);
+
+    batch.shutdown(dev);
+}
+
+TEST(SpriteBatch, TransformRotationMovesTheCornersAndLeavesTheUvsPut) {
+    RecordingDevice dev;
+    SpriteBatch batch;
+    ASSERT_TRUE(batch.init(dev));
+    const auto tex = dev.create_texture({}).value_or(rhi::TextureHandle{});
+
+    // A quarter turn, written out rather than derived from cos/sin so the
+    // expected corners stay exact.
+    mat4 m(1.0f);
+    m[0] = vec4(0.0f, 1.0f, 0.0f, 0.0f);
+    m[1] = vec4(-1.0f, 0.0f, 0.0f, 0.0f);
+
+    batch.begin(dev, 100, 100);
+    batch.draw(tex, m, {4.0f, 2.0f}, vec4{0.0f, 0.0f, 1.0f, 1.0f}, vec4{1.0f});
+    batch.end();
+
+    // The 4-wide, 2-tall quad now stands 2 wide and 4 tall.
+    ASSERT_EQ(dev.vertices.size(), 4u);
+    // Rotation moves the corner but not which texel it samples: the quad's own
+    // top-left still carries (min_u, min_v) wherever it lands.
+    const RecordedVertex& local_top_left = vertex_at(dev.vertices, 1.0f, -2.0f);
+    EXPECT_FLOAT_EQ(local_top_left.u, 0.0f);
+    EXPECT_FLOAT_EQ(local_top_left.v, 0.0f);
+    const RecordedVertex& local_bottom_right = vertex_at(dev.vertices, -1.0f, 2.0f);
+    EXPECT_FLOAT_EQ(local_bottom_right.u, 1.0f);
+    EXPECT_FLOAT_EQ(local_bottom_right.v, 1.0f);
+
+    batch.shutdown(dev);
+}
+
+TEST(SpriteBatch, AnIdentityTransformMatchesThePositionOverload) {
+    RecordingDevice dev;
+    SpriteBatch batch;
+    ASSERT_TRUE(batch.init(dev));
+    const auto tex = dev.create_texture({}).value_or(rhi::TextureHandle{});
+
+    mat4 m(1.0f);
+    m[3] = vec4(50.0f, 50.0f, 0.0f, 1.0f);
+    batch.begin(dev, 100, 100);
+    batch.draw(tex, m, {20.0f, 20.0f}, vec4{0.0f, 0.0f, 1.0f, 1.0f}, vec4{1.0f});
+    batch.end();
+    const std::vector<RecordedVertex> via_matrix = dev.vertices;
+
+    dev.vertices.clear();
+    batch.begin(dev, 100, 100);
+    batch.draw(tex, {50.0f, 50.0f}, {20.0f, 20.0f});
+    batch.end();
+
+    ASSERT_EQ(via_matrix.size(), dev.vertices.size());
+    for (size_t i = 0; i < via_matrix.size(); ++i) {
+        EXPECT_FLOAT_EQ(via_matrix[i].x, dev.vertices[i].x);
+        EXPECT_FLOAT_EQ(via_matrix[i].y, dev.vertices[i].y);
+        EXPECT_FLOAT_EQ(via_matrix[i].u, dev.vertices[i].u);
+        EXPECT_FLOAT_EQ(via_matrix[i].v, dev.vertices[i].v);
+    }
+
+    batch.shutdown(dev);
+}
+
 TEST(SpriteBatch, VertexColorIsCarriedToEveryCorner) {
     RecordingDevice dev;
     SpriteBatch batch;

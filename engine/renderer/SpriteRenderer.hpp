@@ -41,6 +41,11 @@ class SpriteBatch {
     /// Centered quad with an explicit UV sub-rectangle.
     void draw(rhi::TextureHandle, vec2 pos, vec2 size,
               vec4 uv_rect /* min_u, min_v, max_u, max_v */, vec4 color);
+    /// Quad centered on `transform`'s origin and carried through its rotation
+    /// and scale, for sprites whose transform is more than a translation.
+    /// `size` is still in local units; the transform scales it.
+    void draw(rhi::TextureHandle, const mat4& transform, vec2 size,
+              vec4 uv_rect /* min_u, min_v, max_u, max_v */, vec4 color);
 
     /// Draw calls submitted in the most recently ended frame.
     uint32_t draw_calls() const { return m_last_draw_calls; }
@@ -54,6 +59,9 @@ class SpriteBatch {
         float r, g, b, a;
     };
 
+    /// Shared draw() prologue: applies the texture-change and capacity flush.
+    /// False means the quad must be dropped.
+    bool prepare(rhi::TextureHandle);
     void flush();
 
     rhi::IDevice* m_device{nullptr};

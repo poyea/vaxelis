@@ -157,10 +157,10 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 color) 
     draw(tex, pos, size, vec4(0.0f, 0.0f, 1.0f, 1.0f), color);
 }
 
-void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect, vec4 color) {
+bool SpriteBatch::prepare(rhi::TextureHandle tex) {
     assert(m_in_frame && "SpriteBatch::draw outside begin/end");
     if (!tex.valid())
-        return;
+        return false;
 
     // Flush on texture change or when the per-batch cap is hit.
     if (m_current_tex.id != tex.id || m_verts.size() / 4 >= m_max_quads) {
@@ -169,6 +169,12 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect
     } else if (!m_current_tex.valid()) {
         m_current_tex = tex;
     }
+    return true;
+}
+
+void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect, vec4 color) {
+    if (!prepare(tex))
+        return;
 
     const float hw = size.x * 0.5f;
     const float hh = size.y * 0.5f;
@@ -183,6 +189,33 @@ void SpriteBatch::draw(rhi::TextureHandle tex, vec2 pos, vec2 size, vec4 uv_rect
     m_verts.push_back({x1, y0, u1, v0, color.r, color.g, color.b, color.a});
     m_verts.push_back({x1, y1, u1, v1, color.r, color.g, color.b, color.a});
     m_verts.push_back({x0, y1, u0, v1, color.r, color.g, color.b, color.a});
+    ++m_quads;
+}
+
+void SpriteBatch::draw(rhi::TextureHandle tex, const mat4& transform, vec2 size, vec4 uv_rect,
+                       vec4 color) {
+    if (!prepare(tex))
+        return;
+
+    // The quad's corners are (+-hw, +-hh) in the transform's local space, so
+    // rotation and scale come along for free. Only the 2D part of the matrix can
+    // move a sprite, so half the axes and the whole z row are dead weight: four
+    // corners cost four multiply-adds here rather than four mat4 * vec4.
+    const vec2 ax{transform[0].x * size.x * 0.5f, transform[0].y * size.x * 0.5f};
+    const vec2 ay{transform[1].x * size.y * 0.5f, transform[1].y * size.y * 0.5f};
+    const vec2 c{transform[3].x, transform[3].y};
+    // Same winding as the axis-aligned overload: top-left, top-right,
+    // bottom-right, bottom-left, which is what the index buffer assumes.
+    const vec2 tl = c - ax - ay;
+    const vec2 tr = c + ax - ay;
+    const vec2 br = c + ax + ay;
+    const vec2 bl = c - ax + ay;
+    const float u0 = uv_rect.x, v0 = uv_rect.y;
+    const float u1 = uv_rect.z, v1 = uv_rect.w;
+    m_verts.push_back({tl.x, tl.y, u0, v0, color.r, color.g, color.b, color.a});
+    m_verts.push_back({tr.x, tr.y, u1, v0, color.r, color.g, color.b, color.a});
+    m_verts.push_back({br.x, br.y, u1, v1, color.r, color.g, color.b, color.a});
+    m_verts.push_back({bl.x, bl.y, u0, v1, color.r, color.g, color.b, color.a});
     ++m_quads;
 }
 
