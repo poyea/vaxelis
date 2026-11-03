@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <string_view>
@@ -82,6 +83,13 @@ class Scene {
         size_t parent{kNoParent};
     };
 
+    /// One sprite awaiting its draw call, carrying the keys it is sorted by.
+    struct SpriteDrawItem {
+        entt::entity entity{entt::null};
+        int z_order{0};
+        uint32_t texture{0};
+    };
+
     void destroy_recursive(entt::entity e);
     void detach_from_parent(entt::entity e);
 
@@ -97,6 +105,11 @@ class Scene {
     /// index instead of looking the component back up.
     std::vector<mat4> m_world;
     bool m_order_dirty{true};
+
+    /// Sort scratch for render_sprites, kept between frames so a steady scene
+    /// stops hitting the heap once the vector has grown to its working size.
+    /// Mutable because rendering is logically a read of the scene.
+    mutable std::vector<SpriteDrawItem> m_sprite_items;
 };
 
 } // namespace vaxelis

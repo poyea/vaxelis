@@ -170,26 +170,25 @@ void Scene::render_sprites(SpriteBatch& batch) const {
     const_cast<Scene*>(this)->update_world_transforms();
 
     // Sort by (z_order, texture_id) so same-texture sprites at the same depth
-    // collapse into a single draw call in the batcher.
-    struct Item {
-        entt::entity e;
-        int z;
-        uint32_t tex;
-    };
-    std::vector<Item> items;
+    // collapse into a single draw call in the batcher. The scratch vector is a
+    // member: clear() keeps the capacity, so only a scene that grows past its
+    // previous sprite count allocates.
+    m_sprite_items.clear();
     auto view = m_registry.view<const SpriteComponent>();
     for (auto e : view) {
         const auto& s = view.get<const SpriteComponent>(e);
         if (!s.visible || !s.texture.valid())
             continue;
-        items.push_back({e, s.z_order, s.texture.id});
+        m_sprite_items.push_back(SpriteDrawItem{e, s.z_order, s.texture.id});
     }
-    std::ranges::stable_sort(items, {}, [](const Item& i) { return std::pair{i.z, i.tex}; });
-    for (const auto& it : items) {
-        const auto& s = m_registry.get<const SpriteComponent>(it.e);
+    std::ranges::stable_sort(m_sprite_items, {}, [](const SpriteDrawItem& i) {
+        return std::pair{i.z_order, i.texture};
+    });
+    for (const auto& it : m_sprite_items) {
+        const auto& s = m_registry.get<const SpriteComponent>(it.entity);
         // The whole world matrix, not just its translation column: a sprite
         // inherits the rotation and scale of every ancestor as well as its own.
-        const auto& w = m_registry.get<WorldTransform2D>(it.e).matrix;
+        const auto& w = m_registry.get<WorldTransform2D>(it.entity).matrix;
         batch.draw(s.texture, w, s.size, s.uv_rect, s.color);
     }
 }
