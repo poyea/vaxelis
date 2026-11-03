@@ -3,9 +3,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <entt/entt.hpp>
 
@@ -53,10 +55,11 @@ class Scene {
     /// for the common per-frame case.
     mat4 world_matrix(entt::entity e) const;
 
-    /// Single DFS from root that writes WorldTransform2D into every entity that
-    /// has Transform2D + Hierarchy. O(N). Call once per frame before reading
-    /// WorldTransform2D from any system that needs world space (rendering,
-    /// picking, etc.). render_sprites calls this implicitly.
+    /// Writes WorldTransform2D into every node reachable from the root. O(N),
+    /// a single forward pass over a cached depth-ordered node list rather than
+    /// a tree walk. Call once per frame before reading WorldTransform2D from
+    /// any system that needs world space (rendering, picking, etc.).
+    /// render_sprites calls this implicitly.
     void update_world_transforms();
 
     /// Depth-first traversal in child order. Visitor is called for each entity
@@ -68,11 +71,32 @@ class Scene {
     void render_sprites(SpriteBatch& batch) const;
 
   private:
+    static constexpr size_t kNoParent = static_cast<size_t>(-1);
+
+    /// One node in the flattened traversal order, paired with the index of its
+    /// parent in the same list. The order is DFS preorder, so a parent always
+    /// precedes its children and its world matrix is ready by the time the
+    /// child is reached.
+    struct OrderEntry {
+        entt::entity entity{entt::null};
+        size_t parent{kNoParent};
+    };
+
     void destroy_recursive(entt::entity e);
     void detach_from_parent(entt::entity e);
 
+    /// Recomputes m_order from the hierarchy. Called lazily from
+    /// update_world_transforms when a structural edit has invalidated it.
+    void rebuild_order();
+
     entt::registry m_registry;
     entt::entity m_root{entt::null};
+
+    std::vector<OrderEntry> m_order;
+    /// World matrix per m_order slot, so a child reads its parent's result by
+    /// index instead of looking the component back up.
+    std::vector<mat4> m_world;
+    bool m_order_dirty{true};
 };
 
 } // namespace vaxelis

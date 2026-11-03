@@ -4,7 +4,9 @@
 #include "engine/scene/Scene.hpp"
 
 #include <algorithm>
+#include <ranges>
 #include <utility>
+#include <vector>
 
 #include "engine/renderer/SpriteRenderer.hpp"
 
@@ -26,6 +28,7 @@ entt::entity Scene::create_node(std::string name, entt::entity parent, Uuid uuid
     m_registry.emplace<Hierarchy>(e, Hierarchy{parent, {}});
     m_registry.emplace<Transform2D>(e);
     m_registry.get<Hierarchy>(parent).children.push_back(e);
+    m_order_dirty = true;
     return e;
 }
 
@@ -63,6 +66,7 @@ void Scene::destroy_node(entt::entity e) {
         return;
     detach_from_parent(e);
     destroy_recursive(e);
+    m_order_dirty = true;
 }
 
 void Scene::set_parent(entt::entity e, entt::entity new_parent) {
@@ -85,6 +89,7 @@ void Scene::set_parent(entt::entity e, entt::entity new_parent) {
     auto& eh = m_registry.get<Hierarchy>(e);
     eh.parent = new_parent;
     m_registry.get<Hierarchy>(new_parent).children.push_back(e);
+    m_order_dirty = true;
 }
 
 mat4 Scene::world_matrix(entt::entity e) const {
@@ -101,21 +106,49 @@ mat4 Scene::world_matrix(entt::entity e) const {
     return m;
 }
 
-void Scene::update_world_transforms() {
-    auto walk = [&](auto& self, entt::entity e, const mat4& parent_world) -> void {
+void Scene::rebuild_order() {
+    m_order.clear();
+    // Iterative DFS: an explicit stack keeps a deep tree off the call stack.
+    // Children are pushed in reverse so they pop back in authoring order.
+    std::vector<std::pair<entt::entity, size_t>> stack;
+    stack.emplace_back(m_root, kNoParent);
+    while (!stack.empty()) {
+        const auto [e, parent] = stack.back();
+        stack.pop_back();
         if (!m_registry.valid(e))
-            return;
-        mat4 world = parent_world;
-        if (const auto* t = m_registry.try_get<Transform2D>(e)) {
-            world = parent_world * t->local_matrix();
-        }
-        m_registry.emplace_or_replace<WorldTransform2D>(e, world);
+            continue;
+        const size_t index = m_order.size();
+        m_order.push_back(OrderEntry{e, parent});
         if (const auto* h = m_registry.try_get<Hierarchy>(e)) {
-            for (auto c : h->children)
-                self(self, c, world);
+            for (auto c : std::ranges::reverse_view(h->children))
+                stack.emplace_back(c, index);
         }
-    };
-    walk(walk, m_root, mat4(1.0f));
+    }
+    m_world.assign(m_order.size(), mat4(1.0f));
+    m_order_dirty = false;
+}
+
+void Scene::update_world_transforms() {
+    if (m_order_dirty)
+        rebuild_order();
+
+    static const mat4 kIdentity(1.0f);
+    for (size_t i = 0; i < m_order.size(); ++i) {
+        const OrderEntry& entry = m_order[i];
+        const mat4& parent_world = entry.parent == kNoParent ? kIdentity : m_world[entry.parent];
+        // An entity destroyed through the registry rather than destroy_node
+        // leaves a stale slot; pass the parent's matrix through so descendants
+        // still land somewhere sane instead of writing to a dead entity.
+        if (!m_registry.valid(entry.entity)) {
+            m_world[i] = parent_world;
+            continue;
+        }
+        mat4 world = parent_world;
+        if (const auto* t = m_registry.try_get<Transform2D>(entry.entity))
+            world = parent_world * t->local_matrix();
+        m_world[i] = world;
+        m_registry.emplace_or_replace<WorldTransform2D>(entry.entity, world);
+    }
 }
 
 void Scene::for_each(const std::function<void(entt::entity)>& visit) const {
