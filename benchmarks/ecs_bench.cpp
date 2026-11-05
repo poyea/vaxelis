@@ -144,6 +144,29 @@ void bench_create(int count) {
     row("create + 2 components", count, entt_ms, arch_ms);
 }
 
+/// The same entity shape as bench_create, built through the variadic create()
+/// instead of create() + add() + add(). The entt side is deliberately identical
+/// to the row above: holding the baseline still is what makes the pair of rows
+/// isolate the cost of the two migrations the variadic path skips.
+void bench_create_variadic(int count) {
+    const double entt_ms = best_of([&] {
+        entt::registry reg;
+        for (int i = 0; i < count; ++i) {
+            const auto e = reg.create();
+            reg.emplace<Position>(e);
+            reg.emplace<Velocity>(e);
+        }
+        g_sink += static_cast<double>(reg.storage<Position>().size());
+    });
+    const double arch_ms = best_of([&] {
+        vaxelis::ecs::World world;
+        for (int i = 0; i < count; ++i)
+            world.create(Position{}, Velocity{});
+        g_sink += static_cast<double>(world.size());
+    });
+    row("create variadic", count, entt_ms, arch_ms);
+}
+
 /// Structural churn: the archetype worst case, one migration per operation.
 void bench_add_remove(int count) {
     entt::registry reg;
@@ -188,6 +211,7 @@ int main() {
         bench_sweep_one(count);
         bench_sweep_two(count);
         bench_create(count);
+        bench_create_variadic(count);
         bench_add_remove(count);
     }
     // Printed so the accumulator is observably used; the value itself is noise.
