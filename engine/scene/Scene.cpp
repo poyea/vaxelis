@@ -16,38 +16,38 @@ Scene::Scene() {
     init_root();
 }
 
-Scene::Scene(Scene&& other) noexcept
-    : m_registry(std::move(other.m_registry)), m_root(other.m_root),
-      m_order(std::move(other.m_order)), m_world(std::move(other.m_world)),
-      m_order_dirty(other.m_order_dirty), m_sprite_items(std::move(other.m_sprite_items)) {
-    rebind_listeners(other);
-    other.init_root();
+// Both operations are swaps, because entt::registry's own move assignment is a
+// swap and its move constructor rebinds only the destination: a scene whose
+// registry was moved out of is not something entt promises is usable. Trading
+// contents instead leaves both ends valid, and the source -- a temporary, in
+// the `m_scene = Scene{}` idiom -- takes the old scene to the grave with it.
+Scene::Scene(Scene&& other) : Scene() {
+    swap(other);
 }
 
 Scene& Scene::operator=(Scene&& other) noexcept {
-    if (this != &other) {
-        // Replacing the registry releases the entities this scene held, which
-        // fires their destroy signals while the old listeners are still bound
-        // here; harmless, since all they do is set the dirty flag that the
-        // assignment below overwrites.
-        m_registry = std::move(other.m_registry);
-        m_root = other.m_root;
-        m_order = std::move(other.m_order);
-        m_world = std::move(other.m_world);
-        m_order_dirty = other.m_order_dirty;
-        m_sprite_items = std::move(other.m_sprite_items);
-        rebind_listeners(other);
-        other.init_root();
-    }
+    if (this != &other)
+        swap(other);
     return *this;
+}
+
+void Scene::swap(Scene& other) noexcept {
+    using std::swap;
+    m_registry.swap(other.m_registry);
+    swap(m_root, other.m_root);
+    swap(m_order, other.m_order);
+    swap(m_world, other.m_world);
+    swap(m_order_dirty, other.m_order_dirty);
+    swap(m_sprite_items, other.m_sprite_items);
+    // The connections live in the component pools, so they travelled with the
+    // registries: each side's listeners now name the other scene.
+    rebind_listeners(other);
+    other.rebind_listeners(*this);
 }
 
 void Scene::init_root() {
     // Listeners first: emplacing the root's Hierarchy below fires one.
     connect_listeners();
-    m_order.clear();
-    m_world.clear();
-    m_sprite_items.clear();
     m_root = m_registry.create();
     m_registry.emplace<Name>(m_root, "Root");
     m_registry.emplace<Hierarchy>(m_root);

@@ -32,13 +32,19 @@ class Scene {
     Scene& operator=(const Scene&) = delete;
 
     /// Movable, but only through these: the constructor installs Hierarchy
-    /// construct/destroy listeners bound to `this`, and the registry carries
-    /// them along when it moves. An implicit move would leave them pointing at
-    /// the moved-from scene, so they are rebound here. The source is reset to a
-    /// valid empty scene, since `m_scene = Scene{}` is how the runtime and the
-    /// examples clear a scene.
-    Scene(Scene&& other) noexcept;
+    /// construct/destroy listeners bound to `this`, and those connections live
+    /// in the component pools, so they follow the registry. An implicit move
+    /// would leave them naming the scene they came from.
+    ///
+    /// Both are implemented as swaps, mirroring entt::registry, so neither side
+    /// is ever left in the moved-from state entt declines to support. The
+    /// constructor is not noexcept: it default-constructs a scene (one root
+    /// entity) before trading contents with the source.
+    Scene(Scene&& other);
     Scene& operator=(Scene&& other) noexcept;
+
+    /// Exchanges contents with `other`, rebinding both scenes' listeners.
+    void swap(Scene& other) noexcept;
 
     /// Direct registry access; see the class note about hierarchy invariants.
     entt::registry& registry() { return m_registry; }
@@ -108,8 +114,7 @@ class Scene {
     void destroy_recursive(entt::entity e);
     void detach_from_parent(entt::entity e);
 
-    /// Installs the Hierarchy listeners and mints the root. Shared by the
-    /// constructor and by whichever scene a move leaves empty.
+    /// Installs the Hierarchy listeners and mints the root.
     void init_root();
 
     /// Subscribes mark_order_dirty to Hierarchy construction and destruction,
@@ -117,7 +122,7 @@ class Scene {
     /// including a registry.destroy() that bypasses destroy_node.
     void connect_listeners();
 
-    /// Repoints listeners that arrived with a moved registry from `previous`
+    /// Repoints listeners that arrived with a swapped registry from `previous`
     /// onto this scene.
     void rebind_listeners(Scene& previous);
 
