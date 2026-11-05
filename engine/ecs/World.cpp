@@ -11,7 +11,7 @@ World::World() {
     // The empty archetype always exists: a freshly created entity lives there
     // until it is given its first component. Minting it up front keeps
     // archetype_count() honest on a world nothing has been created in yet.
-    (void)empty_table();
+    (void) empty_table();
 }
 
 World::~World() = default;
