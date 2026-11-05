@@ -11,6 +11,7 @@
 #include "engine/debug/ImGuiLayer.hpp"
 #include "engine/input/Input.hpp"
 #include "engine/math/Math.hpp"
+#include "engine/renderer/SpriteRenderer.hpp"
 #include "engine/rhi/Rhi.hpp"
 
 struct SDL_Window;
@@ -23,6 +24,16 @@ struct AppConfig {
     uint32_t width{1280};
     uint32_t height{720};
     rhi::Backend backend{rhi::Backend::OpenGL};
+
+    /// Optional fixed-size offscreen pass. When both are non-zero, on_render()
+    /// draws into a render target of exactly this size and Application upscales
+    /// it to the window, by the largest integer factor that fits so the pixel
+    /// grid stays square, letterboxing what is left over. width() and height()
+    /// then report the target's size, so a projection built from them is the
+    /// right one. ImGui is unaffected: it draws to the window after the upscale,
+    /// at full resolution.
+    uint32_t render_width{0};
+    uint32_t render_height{0};
 };
 
 /// Owns window + GL context + device + ImGui. Subclass and override the hooks.
@@ -64,10 +75,18 @@ class Application {
     rhi::IDevice& device() { return *m_device; }
     Input& input() { return m_input; }
     Audio& audio() { return m_audio; }
-    /// Framebuffer width in pixels (drawable size; may differ from window size on hidpi).
-    uint32_t width() const { return m_fb_width; }
-    /// Framebuffer height in pixels.
-    uint32_t height() const { return m_fb_height; }
+    /// Width in pixels of whatever on_render() draws into: the offscreen target
+    /// when AppConfig asked for one, otherwise the window's drawable size (which
+    /// may differ from its logical size on hidpi).
+    uint32_t width() const { return m_offscreen ? m_cfg.render_width : m_fb_width; }
+    /// Height in pixels of whatever on_render() draws into. See width().
+    uint32_t height() const { return m_offscreen ? m_cfg.render_height : m_fb_height; }
+    /// The window's drawable width, regardless of any offscreen pass. Needed
+    /// only by code that has to reason about real pixels, such as hit-testing a
+    /// mouse position against the upscale.
+    uint32_t window_width() const { return m_fb_width; }
+    /// The window's drawable height, regardless of any offscreen pass.
+    uint32_t window_height() const { return m_fb_height; }
     /// Mutable; the next frame clears with this color.
     vec4& clear_color() { return m_clear_color; }
 
@@ -79,10 +98,22 @@ class Application {
     void refresh_drawable_size();
     void step_frame(); // one iteration of the main loop (shared desktop/web)
 
+    /// Creates the offscreen target and the batch that upscales it. Returns
+    /// false if either fails, in which case rendering stays direct-to-window.
+    bool init_offscreen();
+    /// Draws the offscreen colour attachment over the window.
+    void blit_offscreen();
+
     AppConfig m_cfg;
     SDL_Window* m_window{nullptr};
     void* m_gl_ctx{nullptr};
     std::unique_ptr<rhi::IDevice> m_device;
+    /// Null unless AppConfig asked for an offscreen pass.
+    rhi::RenderTargetHandle m_target{};
+    /// Draws the one quad that upscales m_target; separate from any batch the
+    /// application owns, so an offscreen pass cannot disturb its state.
+    SpriteBatch m_blit;
+    bool m_offscreen{false};
     ImGuiLayer m_imgui;
     Input m_input;
     Audio m_audio;

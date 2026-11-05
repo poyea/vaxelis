@@ -4,6 +4,8 @@
 #include "engine/core/Application.hpp"
 
 #include <SDL3/SDL.h>
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 #ifdef __EMSCRIPTEN__
@@ -74,11 +76,76 @@ bool Application::init() {
     }
 
     refresh_drawable_size();
+
+    if (m_cfg.render_width > 0 && m_cfg.render_height > 0) {
+        m_offscreen = init_offscreen();
+        if (!m_offscreen)
+            VX_WARN("Offscreen pass unavailable; rendering straight to the window");
+    }
+
     m_inited = true;
     return true;
 }
 
+bool Application::init_offscreen() {
+    // Nearest: the whole point is an integer upscale of a low-resolution image,
+    // and Linear would smear it back into mush.
+    const rhi::RenderTargetDesc desc{.width = m_cfg.render_width,
+                                     .height = m_cfg.render_height,
+                                     .format = rhi::TextureFormat::RGBA8,
+                                     .filter = rhi::TextureFilter::Nearest};
+    auto target = m_device->create_render_target(desc);
+    if (!target) {
+        VX_ERROR("Render target {}x{} failed: {}", m_cfg.render_width, m_cfg.render_height,
+                 rhi::to_string(target.error()));
+        return false;
+    }
+    m_target = *target;
+
+    // One quad per frame is all this batch ever draws.
+    if (!m_blit.init(device(), /*max_quads=*/1)) {
+        VX_ERROR("Blit batch init failed");
+        m_device->destroy(m_target);
+        m_target = {};
+        return false;
+    }
+    return true;
+}
+
+void Application::blit_offscreen() {
+    const rhi::TextureHandle tex = m_device->render_target_texture(m_target);
+    if (!tex.valid())
+        return;
+
+    const float tw = static_cast<float>(m_cfg.render_width);
+    const float th = static_cast<float>(m_cfg.render_height);
+    const float fbw = static_cast<float>(m_fb_width);
+    const float fbh = static_cast<float>(m_fb_height);
+
+    // Largest whole-number magnification that still fits, so one source pixel
+    // covers an exact square of screen pixels. A window too small for even 1:1
+    // keeps the fractional factor instead: a shrunk image beats a cropped one.
+    float scale = std::min(fbw / tw, fbh / th);
+    if (scale >= 1.0f)
+        scale = std::floor(scale);
+
+    // v is flipped: the colour attachment holds row 0 at the bottom, GL's
+    // origin, while an uploaded image holds it at the top. Everything else in
+    // the engine draws uploaded images, so the flip lives here rather than in
+    // SpriteBatch.
+    m_blit.begin(device(), m_fb_width, m_fb_height);
+    m_blit.draw(tex, {fbw * 0.5f, fbh * 0.5f}, {tw * scale, th * scale},
+                vec4(0.0f, 1.0f, 1.0f, 0.0f), vec4(1.0f));
+    m_blit.end();
+}
+
 void Application::shutdown_subsystems() noexcept {
+    if (m_offscreen) {
+        m_blit.shutdown(device());
+        m_device->destroy(m_target);
+        m_target = {};
+        m_offscreen = false;
+    }
     if (m_audio_inited) {
         m_audio.shutdown();
         m_audio_inited = false;
@@ -147,7 +214,16 @@ void Application::step_frame() {
     on_update(frame_dt);
 
     m_device->begin_frame(m_clear_color, m_fb_width, m_fb_height);
-    on_render();
+    if (m_offscreen) {
+        // begin_frame already cleared the window, so the letterbox bars keep
+        // the clear colour; the target needs its own clear.
+        m_device->set_render_target(m_target, m_clear_color);
+        on_render();
+        m_device->set_render_target({}, m_clear_color); // back to the window, no clear
+        blit_offscreen();
+    } else {
+        on_render();
+    }
 
     m_imgui.begin_frame();
     on_imgui();

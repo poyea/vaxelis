@@ -521,7 +521,15 @@ class Platformer final : public vaxelis::Application {
 } // namespace
 
 int main(int /*argc*/, char* /*argv*/[]) {
-    Platformer app({.title = "Vaxelis - Platformer", .width = 1280, .height = 720});
+    // Rendered at half the default window size and upscaled 2x, which is what
+    // exercises the render-target path on a real driver. The camera follows
+    // width()/height(), so the framing is unchanged -- only the pixel grid is
+    // coarser, and now square.
+    Platformer app({.title = "Vaxelis - Platformer",
+                    .width = 1280,
+                    .height = 720,
+                    .render_width = 640,
+                    .render_height = 360});
     if (!app.init())
         return 1;
     return app.run();
