@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 John Law
 
+#include <utility>
+
 #include <gtest/gtest.h>
 
 #include "engine/scene/Components.hpp"
@@ -74,6 +76,61 @@ TEST(WorldTransform, ReparentAfterAnUpdateRecomposesTheChain) {
     const auto& wc = s.registry().get<WorldTransform2D>(c).matrix;
     EXPECT_FLOAT_EQ(wc[3].x, 1.0f);
     EXPECT_FLOAT_EQ(wc[3].y, 21.0f);
+}
+
+TEST(WorldTransform, RegistryDestroyInvalidatesTheCachedOrder) {
+    Scene s;
+    auto a = s.create_node("A");
+    auto b = s.create_node("B", a);
+    s.registry().get<Transform2D>(a).position = {10.0f, 0.0f};
+    s.registry().get<Transform2D>(b).position = {5.0f, 0.0f};
+    s.update_world_transforms();
+
+    // Bypasses destroy_node, so only the Hierarchy destroy signal can save the
+    // cached order from naming a dead entity.
+    s.registry().destroy(b);
+    s.update_world_transforms();
+
+    EXPECT_FALSE(s.registry().valid(b));
+    const auto& wa = s.registry().get<WorldTransform2D>(a).matrix;
+    EXPECT_FLOAT_EQ(wa[3].x, 10.0f);
+}
+
+TEST(WorldTransform, MovedSceneKeepsItsInvalidationListeners) {
+    Scene src;
+    auto a = src.create_node("A");
+    src.registry().get<Transform2D>(a).position = {2.0f, 0.0f};
+    src.update_world_transforms();
+
+    Scene dst(std::move(src));
+    dst.update_world_transforms();
+
+    // The listeners moved with the registry; if they still pointed at `src`
+    // this node would never reach dst's traversal order.
+    auto b = dst.create_node("B", a);
+    dst.registry().get<Transform2D>(b).position = {3.0f, 4.0f};
+    dst.update_world_transforms();
+
+    const auto& wb = dst.registry().get<WorldTransform2D>(b).matrix;
+    EXPECT_FLOAT_EQ(wb[3].x, 5.0f);
+    EXPECT_FLOAT_EQ(wb[3].y, 4.0f);
+}
+
+TEST(WorldTransform, MovedFromSceneIsStillUsable) {
+    Scene src;
+    src.create_node("A");
+    Scene dst(std::move(src));
+
+    // Reset to a fresh scene rather than left hollow: the runtime clears a
+    // scene with `m_scene = Scene{}`, which moves from the temporary.
+    EXPECT_TRUE(src.registry().valid(src.root()));
+    auto fresh = src.create_node("Fresh");
+    src.registry().get<Transform2D>(fresh).position = {6.0f, 7.0f};
+    src.update_world_transforms();
+
+    const auto& wf = src.registry().get<WorldTransform2D>(fresh).matrix;
+    EXPECT_FLOAT_EQ(wf[3].x, 6.0f);
+    EXPECT_FLOAT_EQ(wf[3].y, 7.0f);
 }
 
 TEST(WorldTransform, UpdateAfterDestroyLeavesSurvivorsIntact) {

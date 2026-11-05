@@ -13,10 +13,61 @@
 namespace vaxelis {
 
 Scene::Scene() {
+    init_root();
+}
+
+Scene::Scene(Scene&& other) noexcept
+    : m_registry(std::move(other.m_registry)), m_root(other.m_root),
+      m_order(std::move(other.m_order)), m_world(std::move(other.m_world)),
+      m_order_dirty(other.m_order_dirty), m_sprite_items(std::move(other.m_sprite_items)) {
+    rebind_listeners(other);
+    other.init_root();
+}
+
+Scene& Scene::operator=(Scene&& other) noexcept {
+    if (this != &other) {
+        // Replacing the registry releases the entities this scene held, which
+        // fires their destroy signals while the old listeners are still bound
+        // here; harmless, since all they do is set the dirty flag that the
+        // assignment below overwrites.
+        m_registry = std::move(other.m_registry);
+        m_root = other.m_root;
+        m_order = std::move(other.m_order);
+        m_world = std::move(other.m_world);
+        m_order_dirty = other.m_order_dirty;
+        m_sprite_items = std::move(other.m_sprite_items);
+        rebind_listeners(other);
+        other.init_root();
+    }
+    return *this;
+}
+
+void Scene::init_root() {
+    // Listeners first: emplacing the root's Hierarchy below fires one.
+    connect_listeners();
+    m_order.clear();
+    m_world.clear();
+    m_sprite_items.clear();
     m_root = m_registry.create();
     m_registry.emplace<Name>(m_root, "Root");
     m_registry.emplace<Hierarchy>(m_root);
     m_registry.emplace<Transform2D>(m_root);
+}
+
+void Scene::connect_listeners() {
+    m_registry.on_construct<Hierarchy>().connect<&Scene::mark_order_dirty>(*this);
+    m_registry.on_destroy<Hierarchy>().connect<&Scene::mark_order_dirty>(*this);
+}
+
+void Scene::rebind_listeners(Scene& previous) {
+    // The connections came across with the registry still naming `previous`.
+    m_registry.on_construct<Hierarchy>().disconnect(&previous);
+    m_registry.on_destroy<Hierarchy>().disconnect(&previous);
+    connect_listeners();
+}
+
+void Scene::mark_order_dirty(entt::registry&, entt::entity) {
+    m_order_dirty = true;
 }
 
 entt::entity Scene::create_node(std::string name, entt::entity parent, Uuid uuid) {
@@ -27,8 +78,9 @@ entt::entity Scene::create_node(std::string name, entt::entity parent, Uuid uuid
     m_registry.emplace<Name>(e, Name{std::move(name)});
     m_registry.emplace<Hierarchy>(e, Hierarchy{parent, {}});
     m_registry.emplace<Transform2D>(e);
+    // No explicit invalidation here or in destroy_node: emplacing and releasing
+    // Hierarchy is what the listeners watch.
     m_registry.get<Hierarchy>(parent).children.push_back(e);
-    m_order_dirty = true;
     return e;
 }
 
@@ -66,7 +118,6 @@ void Scene::destroy_node(entt::entity e) {
         return;
     detach_from_parent(e);
     destroy_recursive(e);
-    m_order_dirty = true;
 }
 
 void Scene::set_parent(entt::entity e, entt::entity new_parent) {
@@ -89,6 +140,7 @@ void Scene::set_parent(entt::entity e, entt::entity new_parent) {
     auto& eh = m_registry.get<Hierarchy>(e);
     eh.parent = new_parent;
     m_registry.get<Hierarchy>(new_parent).children.push_back(e);
+    // Reparenting mutates Hierarchy in place, so no signal fires for it.
     m_order_dirty = true;
 }
 
@@ -115,6 +167,9 @@ void Scene::rebuild_order() {
     while (!stack.empty()) {
         const auto [e, parent] = stack.back();
         stack.pop_back();
+        // A child list can still name an entity destroyed straight through the
+        // registry, which never got the chance to unlink itself. Skipping it
+        // here is what keeps the sweep free of liveness checks.
         if (!m_registry.valid(e))
             continue;
         const size_t index = m_order.size();
@@ -132,17 +187,12 @@ void Scene::update_world_transforms() {
     if (m_order_dirty)
         rebuild_order();
 
+    // Every entry is live: a node cannot die without releasing its Hierarchy,
+    // and that fires the listener that forces the rebuild above.
     static const mat4 kIdentity(1.0f);
     for (size_t i = 0; i < m_order.size(); ++i) {
         const OrderEntry& entry = m_order[i];
         const mat4& parent_world = entry.parent == kNoParent ? kIdentity : m_world[entry.parent];
-        // An entity destroyed through the registry rather than destroy_node
-        // leaves a stale slot; pass the parent's matrix through so descendants
-        // still land somewhere sane instead of writing to a dead entity.
-        if (!m_registry.valid(entry.entity)) {
-            m_world[i] = parent_world;
-            continue;
-        }
         mat4 world = parent_world;
         if (const auto* t = m_registry.try_get<Transform2D>(entry.entity))
             world = parent_world * t->local_matrix();
@@ -163,11 +213,9 @@ void Scene::for_each(const std::function<void(entt::entity)>& visit) const {
     walk(walk, m_root);
 }
 
-void Scene::render_sprites(SpriteBatch& batch) const {
+void Scene::render_sprites(SpriteBatch& batch) {
     // Renderer expects cached world transforms; refresh them once per call.
-    // The const_cast is safe: the cache is a frame-local derivation of existing
-    // scene state, not a logical mutation.
-    const_cast<Scene*>(this)->update_world_transforms();
+    update_world_transforms();
 
     // Sort by (z_order, texture_id) so same-texture sprites at the same depth
     // collapse into a single draw call in the batcher. The scratch vector is a

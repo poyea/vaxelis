@@ -27,6 +27,19 @@ class Scene {
     /// Creates an empty scene holding just the root entity.
     Scene();
 
+    /// Not copyable: entt::registry is move-only.
+    Scene(const Scene&) = delete;
+    Scene& operator=(const Scene&) = delete;
+
+    /// Movable, but only through these: the constructor installs Hierarchy
+    /// construct/destroy listeners bound to `this`, and the registry carries
+    /// them along when it moves. An implicit move would leave them pointing at
+    /// the moved-from scene, so they are rebound here. The source is reset to a
+    /// valid empty scene, since `m_scene = Scene{}` is how the runtime and the
+    /// examples clear a scene.
+    Scene(Scene&& other) noexcept;
+    Scene& operator=(Scene&& other) noexcept;
+
     /// Direct registry access; see the class note about hierarchy invariants.
     entt::registry& registry() { return m_registry; }
     /// Read-only registry access, for systems that only query.
@@ -69,7 +82,9 @@ class Scene {
 
     /// Render every visible sprite with its world transform applied. Sprites
     /// with !texture.valid() are skipped (texture resolution is the host's job).
-    void render_sprites(SpriteBatch& batch) const;
+    /// Non-const because it refreshes the WorldTransform2D cache first, which
+    /// is a write to the registry however derived the values are.
+    void render_sprites(SpriteBatch& batch);
 
   private:
     static constexpr size_t kNoParent = static_cast<size_t>(-1);
@@ -93,6 +108,22 @@ class Scene {
     void destroy_recursive(entt::entity e);
     void detach_from_parent(entt::entity e);
 
+    /// Installs the Hierarchy listeners and mints the root. Shared by the
+    /// constructor and by whichever scene a move leaves empty.
+    void init_root();
+
+    /// Subscribes mark_order_dirty to Hierarchy construction and destruction,
+    /// so the traversal order is invalidated however a node appears or dies --
+    /// including a registry.destroy() that bypasses destroy_node.
+    void connect_listeners();
+
+    /// Repoints listeners that arrived with a moved registry from `previous`
+    /// onto this scene.
+    void rebind_listeners(Scene& previous);
+
+    /// Listener signature required by entt; both signals land here.
+    void mark_order_dirty(entt::registry& reg, entt::entity e);
+
     /// Recomputes m_order from the hierarchy. Called lazily from
     /// update_world_transforms when a structural edit has invalidated it.
     void rebuild_order();
@@ -108,8 +139,7 @@ class Scene {
 
     /// Sort scratch for render_sprites, kept between frames so a steady scene
     /// stops hitting the heap once the vector has grown to its working size.
-    /// Mutable because rendering is logically a read of the scene.
-    mutable std::vector<SpriteDrawItem> m_sprite_items;
+    std::vector<SpriteDrawItem> m_sprite_items;
 };
 
 } // namespace vaxelis
