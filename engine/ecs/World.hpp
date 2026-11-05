@@ -44,6 +44,14 @@ class World {
     World(const World&) = delete;
     World& operator=(const World&) = delete;
 
+    /// Movable. Archetypes live behind unique_ptr, so they keep their addresses
+    /// and the Table* in every record survives the move untouched. The source
+    /// is left as a valid empty world -- not merely destructible -- because
+    /// Scene is held and reassigned by value (`m_scene = Scene{}`) and anything
+    /// embedding a World inherits that.
+    World(World&& other) noexcept;
+    World& operator=(World&& other) noexcept;
+
     /// Creates an entity with no components.
     Entity create();
 
@@ -211,6 +219,11 @@ class World {
 
     /// Finds the table for `sig`, creating it when this shape is new.
     Table& table_for(Signature sig, std::span<const ComponentId> ids);
+
+    /// The archetype for the empty signature, created on demand. Cached because
+    /// create() hits it on every call; the lazy path is what lets a moved-from
+    /// world hand its tables away and still serve a later create().
+    Table& empty_table();
 
     /// Appends `e` to `table`, keeping the row map in step.
     void seat(Entity e, Table& table);

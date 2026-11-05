@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 John Law
 
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -445,6 +446,84 @@ TEST(World, VariadicCreateAgreesWithIncrementalConstruction) {
     // Same shape, so it reuses the archetype rather than minting another.
     EXPECT_EQ(w.archetype_count(), shapes);
     EXPECT_EQ(w.size(), 2u);
+}
+
+TEST(World, MoveConstructionCarriesEntitiesAndComponents) {
+    World src;
+    const Entity e = src.create(Pos{1.0f, 2.0f}, Vel{3.0f});
+    const Entity bare = src.create();
+    const size_t shapes = src.archetype_count();
+
+    World dst(std::move(src));
+
+    // Records hold Table*, and the tables live behind unique_ptr, so the move
+    // must not have disturbed either the handles or the component values.
+    EXPECT_TRUE(dst.alive(e));
+    EXPECT_TRUE(dst.alive(bare));
+    EXPECT_EQ(dst.size(), 2u);
+    EXPECT_EQ(dst.archetype_count(), shapes);
+    EXPECT_FLOAT_EQ(dst.try_get<Pos>(e)->x, 1.0f);
+    EXPECT_FLOAT_EQ(dst.try_get<Pos>(e)->y, 2.0f);
+    EXPECT_FLOAT_EQ(dst.try_get<Vel>(e)->dx, 3.0f);
+
+    // Structural change after the move still works, which exercises the
+    // migration path against the moved tables.
+    dst.add<Health>(e, Health{42});
+    EXPECT_EQ(dst.try_get<Health>(e)->hp, 42);
+    EXPECT_FLOAT_EQ(dst.try_get<Pos>(e)->x, 1.0f);
+}
+
+TEST(World, MoveAssignmentReplacesTheDestination) {
+    World dst;
+    dst.create(Pos{9.0f, 9.0f});
+
+    World src;
+    const Entity kept = src.create(Pos{4.0f, 5.0f});
+
+    dst = std::move(src);
+
+    EXPECT_TRUE(dst.alive(kept));
+    EXPECT_EQ(dst.size(), 1u);
+    EXPECT_FLOAT_EQ(dst.try_get<Pos>(kept)->x, 4.0f);
+    EXPECT_FLOAT_EQ(dst.try_get<Pos>(kept)->y, 5.0f);
+}
+
+TEST(World, MovedFromWorldIsStillUsable) {
+    World src;
+    src.create(Pos{1.0f, 1.0f});
+    World dst(std::move(src));
+
+    // Not merely destructible: the source has to behave like a fresh world,
+    // because anything embedding a World is reassigned by value.
+    EXPECT_EQ(src.size(), 0u);
+
+    const Entity e = src.create(Pos{7.0f, 8.0f});
+    EXPECT_TRUE(src.alive(e));
+    EXPECT_EQ(src.size(), 1u);
+    EXPECT_FLOAT_EQ(src.try_get<Pos>(e)->x, 7.0f);
+
+    // And the world it fed is untouched by that.
+    EXPECT_EQ(dst.size(), 1u);
+}
+
+TEST(World, MoveAssignmentDestroysTheComponentsItReplaces) {
+    Counted::alive = 0;
+    {
+        World dst;
+        for (int i = 0; i < 8; ++i)
+            dst.create(Counted{i});
+        EXPECT_EQ(Counted::alive, 8);
+
+        World src;
+        src.create(Counted{99});
+        EXPECT_EQ(Counted::alive, 9);
+
+        // Assigning over dst releases its tables, which runs the destructors of
+        // the eight it held; only src's one survives.
+        dst = std::move(src);
+        EXPECT_EQ(Counted::alive, 1);
+    }
+    EXPECT_EQ(Counted::alive, 0);
 }
 
 TEST(World, VariadicCreateDestroysWhatItBuilt) {

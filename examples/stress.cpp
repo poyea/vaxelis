@@ -18,7 +18,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <memory>
 #include <numeric>
 #include <string>
 #include <vector>
@@ -117,7 +116,7 @@ class Stress final : public vaxelis::Application {
         // and same entity count as phase 1, so the difference is the storage
         // layout and nothing else.
         const auto t_arch = SteadyClock::now();
-        m_ecs->each<vaxelis::Transform2D>([dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
+        m_ecs.each<vaxelis::Transform2D>([dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
         m_archetype.push(ms_since(t_arch));
     }
 
@@ -233,9 +232,9 @@ class Stress final : public vaxelis::Application {
         // Mirror the node count into an archetype world. One add() per entity
         // means one migration each, empty archetype -> {Transform2D}.
         const auto t_ecs = SteadyClock::now();
-        m_ecs = std::make_unique<vaxelis::ecs::World>();
+        m_ecs = vaxelis::ecs::World{};
         for (int i = 0; i < m_nodes; ++i)
-            m_ecs->add<vaxelis::Transform2D>(m_ecs->create());
+            m_ecs.add<vaxelis::Transform2D>(m_ecs.create());
         m_ecs_build_ms = ms_since(t_ecs);
         m_camera.position = {0.0f, 0.0f};
         m_camera.zoom = 640.0f / (span * spacing + 1.0f);
@@ -251,8 +250,8 @@ class Stress final : public vaxelis::Application {
 
     /// Same entity count as the scene, holding Transform2D only, so phase 3
     /// measures column iteration rather than scene-graph bookkeeping. Held by
-    /// pointer because ecs::World is neither copyable nor movable.
-    std::unique_ptr<vaxelis::ecs::World> m_ecs;
+    /// value, the same way the scene is, and rebuilt by move-assignment.
+    vaxelis::ecs::World m_ecs;
 
     Rolling m_anim;
     Rolling m_transform;

@@ -9,11 +9,37 @@ namespace vaxelis::ecs {
 
 World::World() {
     // The empty archetype always exists: a freshly created entity lives there
-    // until it is given its first component.
-    m_empty = &table_for(Signature{}, {});
+    // until it is given its first component. Minting it up front keeps
+    // archetype_count() honest on a world nothing has been created in yet.
+    (void)empty_table();
 }
 
 World::~World() = default;
+
+World::World(World&& other) noexcept
+    : m_tables(std::move(other.m_tables)), m_records(std::move(other.m_records)),
+      m_free(std::move(other.m_free)), m_empty(other.m_empty), m_live(other.m_live) {
+    // The tables moved wholesale, so the source no longer owns the archetype its
+    // m_empty pointed at. Dropping the cache rather than the invariant: the next
+    // create() on the source mints a fresh empty archetype through empty_table().
+    other.m_empty = nullptr;
+    other.m_live = 0;
+}
+
+World& World::operator=(World&& other) noexcept {
+    if (this != &other) {
+        // Assigning over m_tables releases the old unique_ptrs, which runs the
+        // component destructors of every entity this world held.
+        m_tables = std::move(other.m_tables);
+        m_records = std::move(other.m_records);
+        m_free = std::move(other.m_free);
+        m_empty = other.m_empty;
+        m_live = other.m_live;
+        other.m_empty = nullptr;
+        other.m_live = 0;
+    }
+    return *this;
+}
 
 void World::report_stale(const char* op) {
     VX_ERROR("ecs: World::{} called with a stale entity handle", op);
@@ -36,6 +62,12 @@ World::Table& World::table_for(Signature sig, std::span<const ComponentId> ids) 
         return *it->second;
     auto [it, _] = m_tables.emplace(sig, std::make_unique<Table>(ids));
     return *it->second;
+}
+
+World::Table& World::empty_table() {
+    if (m_empty == nullptr)
+        m_empty = &table_for(Signature{}, {});
+    return *m_empty;
 }
 
 void World::seat(Entity e, Table& table) {
@@ -111,7 +143,7 @@ Entity World::allocate_slot() {
 
 Entity World::create() {
     const Entity e = allocate_slot();
-    seat(e, *m_empty);
+    seat(e, empty_table());
     ++m_live;
     return e;
 }
