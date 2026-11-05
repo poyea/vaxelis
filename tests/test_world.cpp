@@ -539,3 +539,118 @@ TEST(World, VariadicCreateDestroysWhatItBuilt) {
     }
     EXPECT_EQ(Counted::alive, 0);
 }
+
+namespace {
+
+/// Subscriber for the signal tests. Member functions, because that is the
+/// shape Sink::connect takes and the one the engine's subsystems use.
+struct Watcher {
+    int constructed{0};
+    int destroyed{0};
+    float value_at_destroy{-1.0f};
+    size_t size_at_destroy{0};
+
+    void on_pos_constructed(World&, Entity) { ++constructed; }
+
+    void on_pos_destroyed(World& w, Entity e) {
+        ++destroyed;
+        // The contract is that this runs before the data goes.
+        if (const Pos* p = w.try_get<Pos>(e))
+            value_at_destroy = p->x;
+        size_at_destroy = w.size();
+    }
+};
+
+} // namespace
+
+TEST(WorldSignals, ConstructFiresForAddAndVariadicCreate) {
+    World w;
+    Watcher watcher;
+    w.on_construct<Pos>().connect<&Watcher::on_pos_constructed>(watcher);
+
+    w.add<Pos>(w.create(), Pos{1.0f, 0.0f});
+    EXPECT_EQ(watcher.constructed, 1);
+
+    w.create(Pos{2.0f, 0.0f}, Vel{1.0f});
+    EXPECT_EQ(watcher.constructed, 2);
+
+    // A second add over an existing Pos is an overwrite, not a construction.
+    const Entity e = w.create(Pos{3.0f, 0.0f});
+    EXPECT_EQ(watcher.constructed, 3);
+    w.add<Pos>(e, Pos{4.0f, 0.0f});
+    EXPECT_EQ(watcher.constructed, 3);
+
+    // A component nobody subscribed to publishes nothing.
+    w.add<Health>(e, Health{1});
+    EXPECT_EQ(watcher.constructed, 3);
+}
+
+TEST(WorldSignals, DestroyFiresWhileTheComponentIsStillReadable) {
+    World w;
+    Watcher watcher;
+    w.on_destroy<Pos>().connect<&Watcher::on_pos_destroyed>(watcher);
+
+    const Entity e = w.create(Pos{7.0f, 0.0f});
+    w.remove<Pos>(e);
+    EXPECT_EQ(watcher.destroyed, 1);
+    EXPECT_FLOAT_EQ(watcher.value_at_destroy, 7.0f);
+    EXPECT_FALSE(w.has<Pos>(e));
+
+    // Taking the whole entity publishes for each component it carried, and the
+    // entity is still counted as live at that point.
+    const Entity whole = w.create(Pos{9.0f, 0.0f}, Vel{1.0f});
+    const size_t live_before = w.size();
+    w.destroy(whole);
+    EXPECT_EQ(watcher.destroyed, 2);
+    EXPECT_FLOAT_EQ(watcher.value_at_destroy, 9.0f);
+    EXPECT_EQ(watcher.size_at_destroy, live_before);
+}
+
+TEST(WorldSignals, DisconnectStopsDelivery) {
+    World w;
+    Watcher by_member;
+    Watcher by_instance;
+    w.on_construct<Pos>().connect<&Watcher::on_pos_constructed>(by_member);
+    w.on_construct<Pos>().connect<&Watcher::on_pos_constructed>(by_instance);
+
+    w.create(Pos{1.0f, 0.0f});
+    EXPECT_EQ(by_member.constructed, 1);
+    EXPECT_EQ(by_instance.constructed, 1);
+
+    w.on_construct<Pos>().disconnect<&Watcher::on_pos_constructed>(by_member);
+    w.create(Pos{2.0f, 0.0f});
+    EXPECT_EQ(by_member.constructed, 1);
+    EXPECT_EQ(by_instance.constructed, 2);
+
+    // The by-instance overload drops every subscription naming it.
+    w.on_construct<Pos>().disconnect(&by_instance);
+    w.create(Pos{3.0f, 0.0f});
+    EXPECT_EQ(by_instance.constructed, 2);
+}
+
+TEST(WorldSignals, SubscriptionsSurviveAWorldMove) {
+    World src;
+    Watcher watcher;
+    src.on_construct<Pos>().connect<&Watcher::on_pos_constructed>(watcher);
+    src.on_destroy<Pos>().connect<&Watcher::on_pos_destroyed>(watcher);
+
+    World dst(std::move(src));
+    const Entity e = dst.create(Pos{5.0f, 0.0f});
+    EXPECT_EQ(watcher.constructed, 1);
+
+    dst.destroy(e);
+    EXPECT_EQ(watcher.destroyed, 1);
+}
+
+TEST(WorldSignals, TeardownDoesNotPublish) {
+    Watcher watcher;
+    {
+        World w;
+        w.on_destroy<Pos>().connect<&Watcher::on_pos_destroyed>(watcher);
+        w.create(Pos{1.0f, 0.0f});
+        w.create(Pos{2.0f, 0.0f});
+    }
+    // Matching entt: the world going away is not each entity being destroyed,
+    // and a subsystem mid-shutdown does not want the callback.
+    EXPECT_EQ(watcher.destroyed, 0);
+}

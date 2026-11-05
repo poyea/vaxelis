@@ -18,9 +18,13 @@ World::World() {
 
 World::~World() = default;
 
+// Subscriptions move with the world. The listeners name their subscriber, not
+// the world, so there is nothing to rebind -- but leaving them behind would
+// silently unsubscribe everyone, so every signal table is listed here.
 World::World(World&& other) noexcept
     : m_tables(std::move(other.m_tables)), m_records(std::move(other.m_records)),
-      m_free(std::move(other.m_free)), m_empty(other.m_empty), m_live(other.m_live) {
+      m_free(std::move(other.m_free)), m_empty(other.m_empty), m_live(other.m_live),
+      m_on_construct(std::move(other.m_on_construct)), m_on_destroy(std::move(other.m_on_destroy)) {
     // The tables moved wholesale, so the source no longer owns the archetype its
     // m_empty pointed at. Dropping the cache rather than the invariant: the next
     // create() on the source mints a fresh empty archetype through empty_table().
@@ -37,6 +41,8 @@ World& World::operator=(World&& other) noexcept {
         m_free = std::move(other.m_free);
         m_empty = other.m_empty;
         m_live = other.m_live;
+        m_on_construct = std::move(other.m_on_construct);
+        m_on_destroy = std::move(other.m_on_destroy);
         other.m_empty = nullptr;
         other.m_live = 0;
     }
@@ -158,6 +164,25 @@ bool World::alive(Entity e) const {
 }
 
 void World::destroy(Entity e) {
+    if (!alive(e))
+        return;
+
+    // Snapshot the shape before telling anyone: a listener is allowed to add or
+    // remove components, which migrates the row and would invalidate the
+    // table's own id list halfway through the walk.
+    std::array<ComponentId, kMaxComponents> ids{};
+    size_t count = 0;
+    for (const ComponentId id : m_records[e.index].table->archetype.component_ids())
+        ids[count++] = id;
+
+    for (size_t i = 0; i < count; ++i) {
+        // A listener may have destroyed the entity itself, or already taken
+        // this component off it.
+        if (!alive(e))
+            return;
+        if (m_records[e.index].table->archetype.has(ids[i]))
+            publish(m_on_destroy, ids[i], e);
+    }
     if (!alive(e))
         return;
 

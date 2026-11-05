@@ -20,6 +20,7 @@
 
 #include "engine/ecs/Archetype.hpp"
 #include "engine/ecs/Entity.hpp"
+#include "engine/ecs/Signal.hpp"
 #include "engine/ecs/Signature.hpp"
 
 namespace vaxelis::ecs {
@@ -52,6 +53,22 @@ class World {
     World(World&& other) noexcept;
     World& operator=(World&& other) noexcept;
 
+    /// Listeners for `T` coming into existence on an entity: a variadic
+    /// create(), or an add() that the entity did not already have. An add()
+    /// that overwrites an existing `T` is not a construction and does not
+    /// publish. Nothing is published for the components an archetype migration
+    /// carries across -- the component did not come or go, only its address.
+    template <class T> Sink on_construct() { return Sink{signal_for<T>(m_on_construct)}; }
+
+    /// Listeners for `T` ceasing to exist: remove<T>(), or destroy() taking the
+    /// whole entity with it. Published *before* the data goes, so a listener
+    /// can still read the component it is being told about.
+    ///
+    /// Not published by ~World(), matching entt: teardown is not deletion, and
+    /// a subsystem whose own destructor is already running does not want the
+    /// call. Release what an entity owns while the world is still alive.
+    template <class T> Sink on_destroy() { return Sink{signal_for<T>(m_on_destroy)}; }
+
     /// Creates an entity with no components.
     Entity create();
 
@@ -74,6 +91,10 @@ class World {
         // seat() default-constructed the columns; drop the supplied values over
         // them in one pass, still without a migration.
         (assign_value<std::remove_cvref_t<Ts>>(e, std::forward<Ts>(values)), ...);
+        // Published only once every component holds its value, so a listener
+        // sees a finished entity rather than a half-built one.
+        for (const ComponentId id : ids)
+            publish(m_on_construct, id, e);
         return e;
     }
 
@@ -123,14 +144,20 @@ class World {
             report_unregistered("add");
             return nullptr;
         }
-        if (!rec->table->archetype.has(id)) {
+        const bool fresh = !rec->table->archetype.has(id);
+        if (fresh) {
             Signature target = rec->table->archetype.signature();
             target.set(id);
             migrate(e, *rec, target);
         }
-        T& slot = rec->table->archetype.get<T>(rec->row);
-        slot = std::move(value);
-        return &slot;
+        rec->table->archetype.get<T>(rec->row) = std::move(value);
+        if (fresh) {
+            publish(m_on_construct, id, e);
+            // A listener is free to make structural changes, which would move
+            // the row out from under a pointer taken before the call.
+            return try_get<T>(e);
+        }
+        return &rec->table->archetype.get<T>(rec->row);
     }
 
     /// Takes `T` away from `e`. A no-op when the entity is stale or does not
@@ -141,6 +168,13 @@ class World {
             return;
         const ComponentId id = component_id<T>();
         if (!rec->table->archetype.has(id))
+            return;
+        // Before the migration drops the column, so a listener can still read
+        // what it is being told about.
+        publish(m_on_destroy, id, e);
+        // The listener may have moved the row, or taken the component itself.
+        rec = find(e);
+        if (rec == nullptr || !rec->table->archetype.has(id))
             return;
         Signature target = rec->table->archetype.signature();
         target.reset(id);
@@ -245,6 +279,30 @@ class World {
     static void report_stale(const char* op);
     static void report_unregistered(const char* op);
 
+    using SignalTable = std::array<Signal, kMaxComponents>;
+
+    /// The signal for `T` in `table`, or a shared bin when the type could not
+    /// register: a subscription that can never fire beats indexing out of
+    /// bounds, and add() already reports the registration failure.
+    template <class T> Signal& signal_for(SignalTable& table) {
+        const ComponentId id = component_id<T>();
+        if (id == kInvalidComponent) {
+            report_unregistered("on_construct/on_destroy");
+            return m_discarded;
+        }
+        return table[id];
+    }
+
+    /// Fires `table`'s listeners for `id`. Inline so an unwatched component
+    /// type pays one empty() test per structural change.
+    void publish(SignalTable& table, ComponentId id, Entity e) {
+        if (id == kInvalidComponent)
+            return;
+        Signal& signal = table[id];
+        if (!signal.empty())
+            signal.publish(*this, e);
+    }
+
     /// The one query walk behind each() and each_entity(). Deducing `Self` lets
     /// the same body serve `World&` and `const World&` -- the archetype's own
     /// const overloads then decide whether the columns come back mutable. `fn`
@@ -272,6 +330,13 @@ class World {
     std::vector<uint32_t> m_free;
     Table* m_empty{nullptr};
     size_t m_live{0};
+
+    /// Indexed by ComponentId. Flat rather than a map: the whole point of a
+    /// signal is that publishing is cheap, and most ids have no listeners.
+    SignalTable m_on_construct;
+    SignalTable m_on_destroy;
+    /// Where subscriptions for an unregisterable type go to be ignored.
+    Signal m_discarded;
 };
 
 } // namespace vaxelis::ecs
