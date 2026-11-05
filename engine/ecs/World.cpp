@@ -10,8 +10,10 @@ namespace vaxelis::ecs {
 World::World() {
     // The empty archetype always exists: a freshly created entity lives there
     // until it is given its first component. Minting it up front keeps
-    // archetype_count() honest on a world nothing has been created in yet.
-    (void) empty_table();
+    // archetype_count() honest on a world nothing has been created in yet;
+    // empty_table() exists for the one case this cannot cover, a world whose
+    // tables have been moved out from under it.
+    m_empty = &table_for(Signature{}, {});
 }
 
 World::~World() = default;
