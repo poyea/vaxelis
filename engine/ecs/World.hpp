@@ -97,11 +97,13 @@ class World {
         ++m_live;
         // seat() default-constructed the columns; drop the staged values over
         // them in one pass, still without a migration.
-        [&]<size_t... I>(std::index_sequence<I...>) {
-            (assign_value<std::tuple_element_t<I, decltype(staged)>>(e,
-                                                                    std::move(std::get<I>(staged))),
-             ...);
-        }(std::index_sequence_for<Ts...>{});
+        std::apply(
+            [&](auto&... staged_values) {
+                (assign_value<std::remove_cvref_t<decltype(staged_values)>>(
+                     e, std::move(staged_values)),
+                 ...);
+            },
+            staged);
         // Published only once every component holds its value, so a listener
         // sees a finished entity rather than a half-built one. A listener is
         // free to destroy the entity or take a component off it, so the state

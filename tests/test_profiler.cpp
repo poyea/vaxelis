@@ -24,6 +24,12 @@ struct ProfilerFixture : ::testing::Test {
     }
 };
 
+/// Exercises the macro itself from a function body, which is where it is meant
+/// to be used; the tests below drive ScopeTimer directly.
+void macro_timed_function() {
+    VX_PROFILE_FUNCTION();
+}
+
 size_t count_occurrences(const std::string& haystack, const std::string& needle) {
     size_t n = 0;
     for (size_t at = haystack.find(needle); at != std::string::npos;
@@ -39,9 +45,7 @@ TEST_F(ProfilerFixture, RecordsNothingUntilASessionStarts) {
     Profiler& p = Profiler::instance();
     ASSERT_FALSE(p.recording());
 
-    {
-        VX_PROFILE_SCOPE("ignored");
-    }
+    macro_timed_function();
     p.record("also ignored", 0, 10);
 
     EXPECT_TRUE(p.events().empty());
@@ -54,9 +58,9 @@ TEST_F(ProfilerFixture, ScopeTimerRecordsOneEventPerScope) {
     p.begin_session("test");
 
     {
-        VX_PROFILE_SCOPE("outer");
+        const ScopeTimer outer{"outer"};
         {
-            VX_PROFILE_SCOPE("inner");
+            const ScopeTimer inner{"inner"};
         }
     }
 
@@ -129,4 +133,14 @@ TEST_F(ProfilerFixture, EndSessionReportsAnUnwritablePath) {
     // Still ended: a failed write must not leave the session recording, or the
     // next begin_session would warn and the events would pile up.
     EXPECT_FALSE(p.recording());
+}
+
+TEST_F(ProfilerFixture, FunctionMacroRecordsUnderTheFunctionName) {
+    Profiler& p = Profiler::instance();
+    p.begin_session("macro");
+
+    macro_timed_function();
+
+    ASSERT_EQ(p.events().size(), 1u);
+    EXPECT_EQ(p.events()[0].name, "macro_timed_function");
 }
