@@ -38,20 +38,19 @@ vec4 load_vec4(const json& j) {
 std::string to_json(const Scene& s, int indent) {
     json out;
     out["nodes"] = json::array();
-    s.for_each([&](entt::entity e) {
+    s.for_each([&](NodeId e) {
         if (e == s.root())
             return;
-        const auto& reg = s.registry();
         json node;
         // Stable per-node identity; survives reorder/merge (see Components::Id).
-        node["id"] = to_string(reg.get<Id>(e).uuid);
-        node["name"] = reg.get<Name>(e).value;
-        const auto parent = reg.get<Hierarchy>(e).parent;
-        node["parent"] = (parent == s.root() || parent == entt::null)
+        node["id"] = to_string(s.get<Id>(e).uuid);
+        node["name"] = s.get<Name>(e).value;
+        const auto parent = s.get<Hierarchy>(e).parent;
+        node["parent"] = (parent == s.root() || parent == kNoNode)
                              ? json(nullptr)
-                             : json(to_string(reg.get<Id>(parent).uuid));
+                             : json(to_string(s.get<Id>(parent).uuid));
 
-        const auto& t = reg.get<Transform2D>(e);
+        const auto& t = s.get<Transform2D>(e);
         node["transform"] = {
             {"pos", save_vec2(t.position)},
             {"rot", t.rotation},
@@ -101,12 +100,11 @@ bool from_json(Scene& s, std::string_view jtext) {
     // Incoming ids that collide are reminted so merges/instancing stay unique;
     // a load into a fresh scene preserves every stored uuid.
     std::unordered_set<Uuid> used;
-    for (auto e : s.registry().view<const Id>())
-        used.insert(s.registry().get<const Id>(e).uuid);
+    s.each<const Id>([&used](const Id& id) { used.insert(id.uuid); });
 
     // Two-pass: create all entities (so parent refs resolve), then wire up
     // parents and populate components.
-    std::unordered_map<std::string, entt::entity> by_token;
+    std::unordered_map<std::string, NodeId> by_token;
     by_token["#0"] = s.root(); // legacy root reference
 
     for (const auto& node : j["nodes"]) {
@@ -120,8 +118,8 @@ bool from_json(Scene& s, std::string_view jtext) {
         Uuid uuid = node["id"].is_string() ? uuid_from_string(token) : Uuid{};
         if (uuid.valid() && !used.insert(uuid).second)
             uuid = {}; // collision: let create_node remint
-        auto e = s.create_node(node.value("name", std::string{"Node"}), entt::null, uuid);
-        used.insert(s.registry().get<Id>(e).uuid); // covers the reminted case
+        auto e = s.create_node(node.value("name", std::string{"Node"}), kNoNode, uuid);
+        used.insert(s.get<Id>(e).uuid); // covers the reminted case
         by_token[token] = e;
     }
 
@@ -144,7 +142,7 @@ bool from_json(Scene& s, std::string_view jtext) {
 
         if (node.contains("transform")) {
             const auto& tj = node["transform"];
-            auto& t = s.registry().get<Transform2D>(e);
+            auto& t = s.get<Transform2D>(e);
             if (tj.contains("pos"))
                 t.position = load_vec2(tj["pos"]);
             if (tj.contains("rot"))
@@ -164,7 +162,7 @@ bool from_json(Scene& s, std::string_view jtext) {
                 sp.color = load_vec4(sj["color"]);
             sp.z_order = sj.value("z_order", 0);
             sp.visible = sj.value("visible", true);
-            s.registry().emplace<SpriteComponent>(e, std::move(sp));
+            s.add<SpriteComponent>(e, std::move(sp));
         }
     }
     return true;

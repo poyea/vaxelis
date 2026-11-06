@@ -25,33 +25,32 @@ void SceneInspector::draw(Scene& scene) {
     ImGui::EndChild();
     ImGui::End();
 
-    if (m_pending_destroy != entt::null) {
+    if (m_pending_destroy != kNoNode) {
         if (m_selected == m_pending_destroy)
-            m_selected = entt::null;
+            m_selected = kNoNode;
         scene.destroy_node(m_pending_destroy);
-        m_pending_destroy = entt::null;
+        m_pending_destroy = kNoNode;
     }
 }
 
 void SceneInspector::draw_hierarchy(Scene& scene) {
     if (ImGui::Button("+ Node")) {
-        auto parent = (m_selected != entt::null) ? m_selected : scene.root();
+        auto parent = (m_selected != kNoNode) ? m_selected : scene.root();
         m_selected = scene.create_node("Node", parent);
     }
     ImGui::SameLine();
-    if (ImGui::Button("Delete") && m_selected != entt::null && m_selected != scene.root()) {
+    if (ImGui::Button("Delete") && m_selected != kNoNode && m_selected != scene.root()) {
         m_pending_destroy = m_selected;
     }
     ImGui::Separator();
     draw_node_recursive(scene, scene.root());
 }
 
-void SceneInspector::draw_node_recursive(Scene& scene, entt::entity e) {
-    auto& reg = scene.registry();
-    if (!reg.valid(e))
+void SceneInspector::draw_node_recursive(Scene& scene, NodeId e) {
+    if (!scene.valid(e))
         return;
-    const auto& name = reg.get<Name>(e).value;
-    const auto& h = reg.get<Hierarchy>(e);
+    const auto& name = scene.get<Name>(e).value;
+    const auto& h = scene.get<Hierarchy>(e);
 
     ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
     if (h.children.empty())
@@ -73,27 +72,26 @@ void SceneInspector::draw_node_recursive(Scene& scene, entt::entity e) {
 }
 
 void SceneInspector::draw_properties(Scene& scene) {
-    if (m_selected == entt::null || !scene.registry().valid(m_selected)) {
+    if (!scene.valid(m_selected)) {
         ImGui::TextDisabled("No selection.");
         return;
     }
-    auto& reg = scene.registry();
-    auto e = m_selected;
+    const NodeId e = m_selected;
 
-    auto& name = reg.get<Name>(e);
+    auto& name = scene.get<Name>(e);
     char buf[128];
     std::snprintf(buf, sizeof(buf), "%s", name.value.c_str());
     if (ImGui::InputText("Name", buf, sizeof(buf)))
         name.value = buf;
 
-    if (auto* t = reg.try_get<Transform2D>(e);
+    if (auto* t = scene.try_get<Transform2D>(e);
         t && ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::DragFloat2("Position", &t->position.x, 1.0f);
         ImGui::DragFloat("Rotation", &t->rotation, 0.01f);
         ImGui::DragFloat2("Scale", &t->scale.x, 0.01f);
     }
 
-    if (auto* s = reg.try_get<SpriteComponent>(e)) {
+    if (auto* s = scene.try_get<SpriteComponent>(e)) {
         if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen)) {
             char tk[128];
             std::snprintf(tk, sizeof(tk), "%s", s->texture_key.c_str());
@@ -110,7 +108,7 @@ void SceneInspector::draw_properties(Scene& scene) {
         }
     } else {
         if (ImGui::Button("+ Sprite component")) {
-            reg.emplace<SpriteComponent>(e);
+            scene.add<SpriteComponent>(e);
         }
     }
 }

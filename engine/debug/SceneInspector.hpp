@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <entt/entt.hpp>
+#include "engine/scene/NodeId.hpp"
 
 namespace vaxelis {
 
@@ -16,18 +16,18 @@ class SceneInspector {
     /// Draws the inspector UI for `scene`.
     void draw(Scene& scene);
 
-    /// Currently selected entity, or entt::null.
-    entt::entity selected() const { return m_selected; }
+    /// Currently selected node, or kNoNode.
+    NodeId selected() const { return m_selected; }
     /// Changes the selection programmatically.
-    void select(entt::entity e) { m_selected = e; }
+    void select(NodeId e) { m_selected = e; }
 
   private:
     void draw_hierarchy(Scene& scene);
-    void draw_node_recursive(Scene& scene, entt::entity e);
+    void draw_node_recursive(Scene& scene, NodeId e);
     void draw_properties(Scene& scene);
 
-    entt::entity m_selected{entt::null};
-    entt::entity m_pending_destroy{entt::null};
+    NodeId m_selected{kNoNode};
+    NodeId m_pending_destroy{kNoNode};
 };
 
 } // namespace vaxelis

@@ -45,7 +45,7 @@ void ScriptHost::register_with(Scene& scene) {
     scene.registry().on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
 }
 
-void ScriptHost::on_script_destroyed(entt::registry& reg, entt::entity e) {
+void ScriptHost::on_script_destroyed(entt::registry& reg, NodeId e) {
     // The registry can outlive the host (teardown ordering); only touch the
     // Lua state while it's still alive.
     if (!m_impl->lua_alive)
@@ -101,32 +101,27 @@ bool ScriptHost::init(Scene& scene, Input& input) {
     // engine.scene.find_by_name(name) -> entity id (uint32_t, 0 if missing)
     auto sc = engine["scene"].get_or_create<sol::table>();
     sc.set_function("find_by_name", [this](const std::string& name) -> uint32_t {
-        entt::entity found = entt::null;
-        m_impl->scene->for_each([&](entt::entity e) {
-            if (found != entt::null)
+        NodeId found = kNoNode;
+        m_impl->scene->for_each([&](NodeId e) {
+            if (found != kNoNode)
                 return;
-            if (m_impl->scene->registry().get<Name>(e).value == name)
+            if (m_impl->scene->get<Name>(e).value == name)
                 found = e;
         });
         return static_cast<uint32_t>(found);
     });
     sc.set_function("get_position", [this](uint32_t id) -> vec2 {
-        auto e = static_cast<entt::entity>(id);
-        if (!m_impl->scene->registry().valid(e))
-            return vec2{0.0f};
-        return m_impl->scene->registry().get<Transform2D>(e).position;
+        const auto e = static_cast<NodeId>(id);
+        const Transform2D* t = m_impl->scene->try_get<Transform2D>(e);
+        return t != nullptr ? t->position : vec2{0.0f};
     });
     sc.set_function("set_position", [this](uint32_t id, vec2 p) {
-        auto e = static_cast<entt::entity>(id);
-        if (!m_impl->scene->registry().valid(e))
-            return;
-        m_impl->scene->registry().get<Transform2D>(e).position = p;
+        if (Transform2D* t = m_impl->scene->try_get<Transform2D>(static_cast<NodeId>(id)))
+            t->position = p;
     });
     sc.set_function("translate", [this](uint32_t id, vec2 d) {
-        auto e = static_cast<entt::entity>(id);
-        if (!m_impl->scene->registry().valid(e))
-            return;
-        m_impl->scene->registry().get<Transform2D>(e).position += d;
+        if (Transform2D* t = m_impl->scene->try_get<Transform2D>(static_cast<NodeId>(id)))
+            t->position += d;
     });
     return true;
 }

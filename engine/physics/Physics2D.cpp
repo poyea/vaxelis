@@ -59,7 +59,7 @@ void Physics2D::register_with(Scene& scene) {
     reg.on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
 }
 
-void Physics2D::on_rb_destroyed(entt::registry& reg, entt::entity e) {
+void Physics2D::on_rb_destroyed(entt::registry& reg, NodeId e) {
     if (!b2World_IsValid(m_world))
         return;
     auto& rb = reg.get<RigidBody2D>(e);
@@ -74,7 +74,7 @@ void Physics2D::on_rb_destroyed(entt::registry& reg, entt::entity e) {
     rb.body = b2_nullBodyId;
 }
 
-void Physics2D::on_col_destroyed(entt::registry& reg, entt::entity e) {
+void Physics2D::on_col_destroyed(entt::registry& reg, NodeId e) {
     if (!b2World_IsValid(m_world))
         return;
     auto& col = reg.get<BoxCollider2D>(e);
@@ -93,14 +93,9 @@ void Physics2D::step(float dt) {
 void Physics2D::sync_to_scene(Scene& scene) {
     if (!b2World_IsValid(m_world))
         return;
-    auto& reg = scene.registry();
-
     // 1) Create bodies for any RigidBody2D that doesn't have one yet, and
     //    attach BoxCollider2D shapes for any unbound collider on the same entity.
-    auto view = reg.view<RigidBody2D, Transform2D>();
-    for (auto e : view) {
-        auto& rb = view.get<RigidBody2D>(e);
-        auto& tr = view.get<Transform2D>(e);
+    scene.each_node<RigidBody2D, Transform2D>([&](NodeId e, RigidBody2D& rb, Transform2D& tr) {
         if (B2_IS_NULL(rb.body)) {
             b2BodyDef bd = b2DefaultBodyDef();
             bd.type = to_b2(rb.type);
@@ -114,7 +109,7 @@ void Physics2D::sync_to_scene(Scene& scene) {
             rb.last_sync_position = tr.position;
             rb.last_sync_rotation = tr.rotation;
         }
-        if (auto* col = reg.try_get<BoxCollider2D>(e)) {
+        if (auto* col = scene.try_get<BoxCollider2D>(e)) {
             if (B2_IS_NULL(col->shape) && !B2_IS_NULL(rb.body)) {
                 b2ShapeDef sd = b2DefaultShapeDef();
                 sd.density = col->density;
@@ -128,48 +123,42 @@ void Physics2D::sync_to_scene(Scene& scene) {
                 col->shape = b2CreatePolygonShape(rb.body, &sd, &poly);
             }
         }
-    }
+    });
 
     // 2) Write physics-driven transforms back to the scene. Static bodies are
     //    skipped since they're authored, not simulated.
-    for (auto e : view) {
-        auto& rb = view.get<RigidBody2D>(e);
-        auto& tr = view.get<Transform2D>(e);
+    scene.each<RigidBody2D, Transform2D>([&](RigidBody2D& rb, Transform2D& tr) {
         if (rb.type == BodyType::Static)
             continue;
         if (B2_IS_NULL(rb.body))
-            continue;
+            return;
         const b2Vec2 p = b2Body_GetPosition(rb.body);
         const b2Rot rt = b2Body_GetRotation(rb.body);
         tr.position = {p.x * m_ppm, p.y * m_ppm};
         tr.rotation = b2Rot_GetAngle(rt);
         rb.last_sync_position = tr.position;
         rb.last_sync_rotation = tr.rotation;
-    }
+    });
 }
 
 void Physics2D::sync_from_scene(Scene& scene) {
     if (!b2World_IsValid(m_world))
         return;
-    auto& reg = scene.registry();
-    auto view = reg.view<RigidBody2D, Transform2D>();
-    for (auto e : view) {
-        auto& rb = view.get<RigidBody2D>(e);
-        auto& tr = view.get<Transform2D>(e);
+    scene.each<RigidBody2D, Transform2D>([this](RigidBody2D& rb, Transform2D& tr) {
         if (B2_IS_NULL(rb.body))
-            continue;
+            return;
         // Skip bodies that haven't moved since our last write; comparing
         // against the exact value we last stored makes this an equality test,
         // not a tolerance one, so the simulation owns untouched dynamic bodies.
         if (tr.position == rb.last_sync_position && tr.rotation == rb.last_sync_rotation)
-            continue;
+            return;
         b2Body_SetTransform(rb.body, b2Vec2{tr.position.x * m_inv_ppm, tr.position.y * m_inv_ppm},
                             b2MakeRot(tr.rotation));
         if (rb.type == BodyType::Dynamic)
             b2Body_SetAwake(rb.body, true);
         rb.last_sync_position = tr.position;
         rb.last_sync_rotation = tr.rotation;
-    }
+    });
 }
 
 } // namespace vaxelis

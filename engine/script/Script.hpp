@@ -10,6 +10,8 @@
 
 #include <entt/entt.hpp>
 
+#include "engine/scene/NodeId.hpp"
+
 // Forward-declare sol::state to keep sol's heavy headers out of clients.
 namespace sol {
 class state;
@@ -57,7 +59,7 @@ class ScriptHost {
     size_t instance_count() const;
 
   private:
-    void on_script_destroyed(entt::registry& reg, entt::entity e);
+    void on_script_destroyed(entt::registry& reg, NodeId e);
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;

@@ -74,12 +74,10 @@ void step(AnimationComponent& a) {
 } // namespace
 
 void update_animations(Scene& scene, float dt) {
-    auto& reg = scene.registry();
-    auto view = reg.view<AnimationComponent, SpriteComponent>();
-    for (auto e : view) {
-        auto& anim = view.get<AnimationComponent>(e);
+    scene.each<AnimationComponent, SpriteComponent>([dt](AnimationComponent& anim,
+                                                         SpriteComponent& sprite) {
         if (anim.frames.empty())
-            continue;
+            return;
 
         if (anim.playing && anim.fps > 0.0f) {
             const float per_frame = 1.0f / anim.fps;
@@ -93,8 +91,8 @@ void update_animations(Scene& scene, float dt) {
         }
 
         if (anim.frame < anim.frames.size())
-            view.get<SpriteComponent>(e).uv_rect = anim.frames[anim.frame];
-    }
+            sprite.uv_rect = anim.frames[anim.frame];
+    });
 }
 
 } // namespace vaxelis

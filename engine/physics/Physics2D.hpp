@@ -9,6 +9,7 @@
 #include <entt/entt.hpp>
 
 #include "engine/math/Math.hpp"
+#include "engine/scene/NodeId.hpp"
 
 namespace vaxelis {
 
@@ -62,8 +63,8 @@ class Physics2D {
     b2WorldId world() const { return m_world; }
 
   private:
-    void on_rb_destroyed(entt::registry& reg, entt::entity e);
-    void on_col_destroyed(entt::registry& reg, entt::entity e);
+    void on_rb_destroyed(entt::registry& reg, NodeId e);
+    void on_col_destroyed(entt::registry& reg, NodeId e);
 
     b2WorldId m_world{b2_nullWorldId};
     Config m_cfg{};

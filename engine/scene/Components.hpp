@@ -11,19 +11,9 @@
 #include "engine/core/Uuid.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/rhi/Rhi.hpp"
+#include "engine/scene/NodeId.hpp"
 
 namespace vaxelis {
-
-/// Handle for one scene node.
-///
-/// An alias for entt's entity while the scene is stored in an entt::registry.
-/// The archetype port swaps it for `ecs::Entity`, so code that spells this name
-/// instead of `entt::entity` needs no edit when that happens. Prefer it, and
-/// prefer the typed accessors on Scene over reaching for registry().
-using NodeId = entt::entity;
-
-/// The handle that refers to no node. Use in place of `entt::null`.
-inline constexpr NodeId kNoNode = static_cast<NodeId>(entt::null);
 
 /// Stable identity. Assigned once at node creation and preserved across
 /// save/load, so references survive reordering and stay unique across merges.
