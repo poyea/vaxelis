@@ -85,16 +85,35 @@ class World {
         for (const ComponentId id : ids)
             sig.set(id);
 
+        // Materialised before seating. An argument can be a reference into a
+        // column -- `create(*try_get<Pos>(other))` clones one -- and seating
+        // grows that column, freeing the buffer the reference points into.
+        // Reading it afterwards is use-after-free. One extra move per
+        // component buys that away.
+        std::tuple<std::remove_cvref_t<Ts>...> staged{std::forward<Ts>(values)...};
+
         const Entity e = allocate_slot();
         seat(e, table_for(sig, ids));
         ++m_live;
-        // seat() default-constructed the columns; drop the supplied values over
+        // seat() default-constructed the columns; drop the staged values over
         // them in one pass, still without a migration.
-        (assign_value<std::remove_cvref_t<Ts>>(e, std::forward<Ts>(values)), ...);
+        [&]<size_t... I>(std::index_sequence<I...>) {
+            (assign_value<std::tuple_element_t<I, decltype(staged)>>(e,
+                                                                    std::move(std::get<I>(staged))),
+             ...);
+        }(std::index_sequence_for<Ts...>{});
         // Published only once every component holds its value, so a listener
-        // sees a finished entity rather than a half-built one.
-        for (const ComponentId id : ids)
-            publish(m_on_construct, id, e);
+        // sees a finished entity rather than a half-built one. A listener is
+        // free to destroy the entity or take a component off it, so the state
+        // is rechecked before each call rather than trusted from before the
+        // first one.
+        for (const ComponentId id : ids) {
+            const Record* rec = find(e);
+            if (rec == nullptr)
+                break;
+            if (rec->table->archetype.has(id))
+                publish(m_on_construct, id, e);
+        }
         return e;
     }
 
@@ -308,11 +327,24 @@ class World {
     /// const overloads then decide whether the columns come back mutable. `fn`
     /// always takes the entity first; the wrappers that do not want it drop it.
     template <class... Ts, class Self, class Fn> static void visit_matching(Self& self, Fn&& fn) {
+        // A type that could not register has no bit in the mask, so the query
+        // would be empty, match every archetype, and then index a column that
+        // does not exist. Refusing to walk beats reading out of bounds.
+        if (((component_id<Ts>() == kInvalidComponent) || ...)) {
+            report_unregistered("each");
+            return;
+        }
         const Signature query = signature_of<Ts...>();
         for (auto& [sig, table] : self.m_tables) {
             if (!sig.contains(query))
                 continue;
-            auto& arch = table->archetype;
+            // The tables are held by unique_ptr, whose operator-> hands back a
+            // mutable pointer however const the map is. Without this the const
+            // overloads of each()/each_entity() would quietly serve mutable
+            // references and the documented contract would be a lie.
+            using TableRef = std::conditional_t<std::is_const_v<Self>, const Table&, Table&>;
+            TableRef bound = *table;
+            auto& arch = bound.archetype;
             const size_t rows = arch.size();
             if (rows == 0)
                 continue;

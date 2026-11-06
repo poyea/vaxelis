@@ -26,6 +26,17 @@ class Physics2D {
         int sub_steps{4};
     };
 
+    Physics2D() = default;
+    /// Unsubscribes and destroys the world, so neither outlives this object.
+    ~Physics2D();
+
+    /// Not copyable or movable: the destroy-signal listeners name this exact
+    /// object, and a move would leave them pointing at the husk.
+    Physics2D(const Physics2D&) = delete;
+    Physics2D& operator=(const Physics2D&) = delete;
+    Physics2D(Physics2D&&) = delete;
+    Physics2D& operator=(Physics2D&&) = delete;
+
     /// Creates the Box2D world with a default Config.
     bool init();
     /// Creates the Box2D world. Returns false if world creation fails.
@@ -37,9 +48,16 @@ class Physics2D {
 
     /// Hooks world destroy-signals so that removing RigidBody2D / BoxCollider2D
     /// (or destroying the owning entity) releases the underlying Box2D handles.
-    /// Call once per Scene, after `init()`. Connections detach when the
-    /// registry is destroyed.
+    /// Call once per Scene, after `init()`.
+    ///
+    /// The subscription names this object, so it must not outlive it: the
+    /// destructor unsubscribes, and registering with a second scene
+    /// unsubscribes from the first.
     void register_with(Scene& scene);
+
+    /// Drops the subscription made by register_with(). Safe to call when none
+    /// was made.
+    void unregister();
 
     /// Advances the world. dt is real seconds. After step(), call sync_to_scene()
     /// to push body positions back into the scene's Transform2D components.
@@ -65,6 +83,10 @@ class Physics2D {
   private:
     void on_rb_destroyed(ecs::World& scene_world, NodeId e);
     void on_col_destroyed(ecs::World& scene_world, NodeId e);
+
+    /// The world register_with() subscribed to, so the destructor can
+    /// unsubscribe. Null when nothing is subscribed.
+    ecs::World* m_scene_world{nullptr};
 
     b2WorldId m_world{b2_nullWorldId};
     Config m_cfg{};

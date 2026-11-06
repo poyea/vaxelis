@@ -38,11 +38,25 @@ struct ScriptHost::Impl {
 ScriptHost::ScriptHost() : m_impl(std::make_unique<Impl>()) {
 }
 ScriptHost::~ScriptHost() {
+    // Unsubscribe first. The lua_alive flag lives in m_impl, which is released
+    // once this destructor returns, so it cannot guard a listener that fires
+    // afterwards -- reading it would be the use-after-free it was meant to
+    // prevent. Dropping the subscription is what actually makes that safe.
+    unregister();
     m_impl->lua_alive = false;
 }
 
 void ScriptHost::register_with(Scene& scene) {
-    scene.world().on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
+    unregister();
+    m_scene_world = &scene.world();
+    m_scene_world->on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
+}
+
+void ScriptHost::unregister() {
+    if (m_scene_world == nullptr)
+        return;
+    m_scene_world->on_destroy<ScriptComponent>().disconnect(this);
+    m_scene_world = nullptr;
 }
 
 void ScriptHost::on_script_destroyed(ecs::World& world, NodeId e) {
@@ -113,7 +127,10 @@ bool ScriptHost::init(Scene& scene, Input& input) {
         m_impl->scene->for_each([&](NodeId e) {
             if (found != kNoNode)
                 return;
-            if (m_impl->scene->get<Name>(e).value == name)
+            // try_get, not get: a node built straight through world() need not
+            // carry a Name, and this walk visits every node there is.
+            const Name* n = m_impl->scene->try_get<Name>(e);
+            if (n != nullptr && n->value == name)
                 found = e;
         });
         return node_key(found);

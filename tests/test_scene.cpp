@@ -210,3 +210,38 @@ TEST(Scene, RenderSpritesInheritsAParentsScale) {
 
     batch.shutdown(dev);
 }
+
+TEST(Scene, StaleParentHandlesDoNotCorruptTheTree) {
+    Scene s;
+    auto a = s.create_node("A");
+    s.create_node("B", a);
+    s.destroy_node(a);
+    ASSERT_FALSE(s.valid(a));
+
+    // A caller holding a selection across a delete is the normal case. The new
+    // node has to land somewhere: root, not nowhere.
+    auto c = s.create_node("C", a);
+    EXPECT_TRUE(s.valid(c));
+    EXPECT_EQ(s.get<Hierarchy>(c).parent, s.root());
+
+    // Reparenting onto a dead node is refused before anything is detached, so
+    // the node keeps the parent it had.
+    auto d = s.create_node("D");
+    s.set_parent(d, a);
+    EXPECT_EQ(s.get<Hierarchy>(d).parent, s.root());
+    const auto& root_kids = s.get<Hierarchy>(s.root()).children;
+    EXPECT_NE(std::find(root_kids.begin(), root_kids.end(), d), root_kids.end());
+}
+
+TEST(Scene, ForEachSkipsChildrenDestroyedThroughTheWorld) {
+    Scene s;
+    auto a = s.create_node("A");
+    auto b = s.create_node("B", a);
+
+    // Bypasses destroy_node, so A's child list still names B.
+    s.world().destroy(b);
+
+    int visited = 0;
+    s.for_each([&](NodeId) { ++visited; });
+    EXPECT_EQ(visited, 2); // root and A
+}

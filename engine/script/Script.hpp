@@ -34,6 +34,9 @@ class ScriptHost {
 
     ScriptHost(const ScriptHost&) = delete;
     ScriptHost& operator=(const ScriptHost&) = delete;
+    /// Not movable either: the destroy-signal listener names this exact object.
+    ScriptHost(ScriptHost&&) = delete;
+    ScriptHost& operator=(ScriptHost&&) = delete;
 
     /// Binds engine API (vec2, scene helpers, input queries) into the Lua state.
     bool init(Scene& scene, Input& input);
@@ -41,9 +44,16 @@ class ScriptHost {
     /// Hooks a world destroy-signal so that removing a ScriptComponent (or
     /// destroying the owning entity) tears down the script's Lua subtable,
     /// letting the table and anything it captured be garbage-collected. Call
-    /// once per Scene, after `init()`. The connection detaches when the registry
-    /// is destroyed.
+    /// once per Scene, after `init()`.
+    ///
+    /// The subscription names this object, so it must not outlive it: the
+    /// destructor unsubscribes, and registering with a second scene
+    /// unsubscribes from the first.
     void register_with(Scene& scene);
+
+    /// Drops the subscription made by register_with(). Safe to call when none
+    /// was made.
+    void unregister();
 
     /// Loads/reloads scripts for every ScriptComponent that needs it, then
     /// calls on_update(dt) on each.
@@ -59,6 +69,10 @@ class ScriptHost {
 
   private:
     void on_script_destroyed(ecs::World& world, NodeId e);
+
+    /// The world register_with() subscribed to, so the destructor can
+    /// unsubscribe. Null when nothing is subscribed.
+    ecs::World* m_scene_world{nullptr};
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;

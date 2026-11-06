@@ -685,3 +685,19 @@ TEST(WorldQueries, QueryTypesIgnoreCvQualifiers) {
     });
     EXPECT_EQ(pairs, 2);
 }
+
+TEST(World, CreateCanCloneAComponentFromTheSameArchetype) {
+    World w;
+    const Entity src = w.create(Pos{1.0f, 2.0f});
+
+    // The argument is a reference into the very column the new row grows, so
+    // one of these iterations crosses a reallocation boundary. Reading the
+    // argument after seating would read freed memory.
+    for (int i = 0; i < 64; ++i) {
+        const Entity clone = w.create(*w.try_get<Pos>(src));
+        ASSERT_NE(w.try_get<Pos>(clone), nullptr);
+        EXPECT_FLOAT_EQ(w.try_get<Pos>(clone)->x, 1.0f);
+        EXPECT_FLOAT_EQ(w.try_get<Pos>(clone)->y, 2.0f);
+    }
+    EXPECT_EQ(w.size(), 65u);
+}

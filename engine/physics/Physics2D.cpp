@@ -53,10 +53,26 @@ void Physics2D::shutdown() {
     }
 }
 
+Physics2D::~Physics2D() {
+    // Order matters: the listeners call into this object, so they go first.
+    unregister();
+    shutdown();
+}
+
 void Physics2D::register_with(Scene& scene) {
-    auto& world = scene.world();
-    world.on_destroy<RigidBody2D>().connect<&Physics2D::on_rb_destroyed>(*this);
-    world.on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
+    unregister();
+    m_scene_world = &scene.world();
+    m_scene_world->on_destroy<RigidBody2D>().connect<&Physics2D::on_rb_destroyed>(*this);
+    m_scene_world->on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
+}
+
+void Physics2D::unregister() {
+    if (m_scene_world == nullptr)
+        return;
+    // By instance: drops both subscriptions whichever member each one names.
+    m_scene_world->on_destroy<RigidBody2D>().disconnect(this);
+    m_scene_world->on_destroy<BoxCollider2D>().disconnect(this);
+    m_scene_world = nullptr;
 }
 
 void Physics2D::on_rb_destroyed(ecs::World& scene_world, NodeId e) {

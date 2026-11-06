@@ -102,6 +102,11 @@ class Scene {
     /// A component the node does not carry yet migrates its row, so this is a
     /// structural change. Build a node through create_node rather than adding
     /// its components one at a time.
+    ///
+    /// Not for `Hierarchy`: parent and children are an invariant pair, and
+    /// writing either one directly leaves the tree and the cached traversal
+    /// order inconsistent -- a cycle written this way hangs set_parent() and
+    /// overflows world_matrix(). Use create_node, destroy_node and set_parent.
     template <class T, class... Args> T& add(NodeId e, Args&&... args) {
         T* slot = m_world.add<T>(e, T{std::forward<Args>(args)...});
         assert(slot != nullptr && "Scene::add on a dead node");

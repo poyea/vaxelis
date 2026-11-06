@@ -20,7 +20,9 @@ World::~World() = default;
 
 // Subscriptions move with the world. The listeners name their subscriber, not
 // the world, so there is nothing to rebind -- but leaving them behind would
-// silently unsubscribe everyone, so every signal table is listed here.
+// silently unsubscribe everyone, so both live signal tables are listed here.
+// m_discarded is deliberately not: it holds subscriptions for types that could
+// not register, which nothing ever publishes.
 World::World(World&& other) noexcept
     : m_tables(std::move(other.m_tables)), m_records(std::move(other.m_records)),
       m_free(std::move(other.m_free)), m_empty(other.m_empty), m_live(other.m_live),

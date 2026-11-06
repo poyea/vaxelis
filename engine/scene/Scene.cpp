@@ -73,6 +73,12 @@ void Scene::mark_order_dirty(ecs::World&, NodeId) {
 NodeId Scene::create_node(std::string name, NodeId parent, Uuid uuid) {
     if (parent == kNoNode)
         parent = m_root;
+    // A handle to a destroyed node is the normal case for a caller holding a
+    // selection across a delete. Re-homing under the root keeps the tree
+    // connected; creating first and failing to link afterwards would leave an
+    // orphan carrying an Id and a Name.
+    if (!has<Hierarchy>(parent))
+        parent = m_root;
     // Every component in one create: see init_root on why this is not four
     // add() calls. WorldTransform2D is in the set so the per-frame sweep only
     // ever overwrites it, never migrates a row to make room for it.
@@ -124,11 +130,15 @@ void Scene::destroy_node(NodeId e) {
 }
 
 void Scene::set_parent(NodeId e, NodeId new_parent) {
-    if (e == kNoNode || e == m_root)
+    if (e == m_root || !has<Hierarchy>(e))
         return;
     if (new_parent == kNoNode)
         new_parent = m_root;
     if (new_parent == e)
+        return;
+    // Checked before detaching, not after: unlinking `e` and then failing to
+    // attach it would leave it parentless and off every child list.
+    if (!has<Hierarchy>(new_parent))
         return;
 
     // Cycle check: walk new_parent up to root, reject if e is on the path.
@@ -186,13 +196,20 @@ void Scene::update_world_transforms() {
     if (m_order_dirty)
         rebuild_order();
 
-    // Every entry is live: a node cannot die without releasing its Hierarchy,
-    // and that fires the listener that forces the rebuild above.
+    // Nearly every entry is live, because a node normally cannot die without
+    // releasing its Hierarchy and firing the rebuild above. One path dodges
+    // that: remove<Hierarchy>() followed by world().destroy() publishes nothing
+    // about Hierarchy at all. Pass the parent's matrix through rather than
+    // writing to a dead handle.
     static const mat4 kIdentity(1.0f);
     for (size_t i = 0; i < m_order.size(); ++i) {
         const OrderEntry& entry = m_order[i];
         const mat4& parent_world =
             entry.parent == kNoParent ? kIdentity : m_world_matrices[entry.parent];
+        if (!valid(entry.entity)) {
+            m_world_matrices[i] = parent_world;
+            continue;
+        }
         mat4 world = parent_world;
         if (const auto* t = try_get<Transform2D>(entry.entity))
             world = parent_world * t->local_matrix();
@@ -209,6 +226,11 @@ void Scene::update_world_transforms() {
 
 void Scene::for_each(const std::function<void(NodeId)>& visit) const {
     auto walk = [&](auto& self, NodeId e) -> void {
+        // A child list can outlive its child, the same way rebuild_order has to
+        // allow for. Serialization walks through here, so visiting a dead handle
+        // would fault on the first component read.
+        if (!valid(e))
+            return;
         visit(e);
         const auto* h = try_get<Hierarchy>(e);
         if (h == nullptr)
@@ -238,10 +260,15 @@ void Scene::render_sprites(SpriteBatch& batch) {
     });
     for (const auto& it : m_sprite_items) {
         const auto& s = get<SpriteComponent>(it.entity);
+        // Only nodes the sweep reached carry a cached transform, and a sprite
+        // built straight through world() reaches nothing. Skipping it beats
+        // dereferencing a component it does not have.
+        const auto* w = try_get<WorldTransform2D>(it.entity);
+        if (w == nullptr)
+            continue;
         // The whole world matrix, not just its translation column: a sprite
         // inherits the rotation and scale of every ancestor as well as its own.
-        const auto& w = get<WorldTransform2D>(it.entity).matrix;
-        batch.draw(s.texture, w, s.size, s.uv_rect, s.color);
+        batch.draw(s.texture, w->matrix, s.size, s.uv_rect, s.color);
     }
 }
 
