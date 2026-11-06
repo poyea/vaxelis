@@ -654,3 +654,34 @@ TEST(WorldSignals, TeardownDoesNotPublish) {
     // and a subsystem mid-shutdown does not want the callback.
     EXPECT_EQ(watcher.destroyed, 0);
 }
+
+TEST(WorldQueries, QueryTypesIgnoreCvQualifiers) {
+    // The port needs this: a query written as each<const Pos> must resolve to
+    // the same component as Pos. If component_id did not strip qualifiers, the
+    // query mask would name a bit no archetype carries and the walk would
+    // silently visit nothing -- passing tests, rendering an empty scene.
+    EXPECT_EQ(component_id<const Pos>(), component_id<Pos>());
+    EXPECT_EQ(component_id<Pos&>(), component_id<Pos>());
+    EXPECT_EQ(component_id<const Pos&>(), component_id<Pos>());
+
+    World w;
+    w.create(Pos{1.0f, 0.0f}, Vel{1.0f});
+    w.create(Pos{2.0f, 0.0f}, Vel{1.0f});
+
+    int visited = 0;
+    float sum = 0.0f;
+    w.each<const Pos>([&](const Pos& p) {
+        ++visited;
+        sum += p.x;
+    });
+    EXPECT_EQ(visited, 2);
+    EXPECT_FLOAT_EQ(sum, 3.0f);
+
+    // Mixed qualification across a multi-component query.
+    int pairs = 0;
+    w.each<const Pos, Vel>([&](const Pos&, Vel& v) {
+        ++pairs;
+        v.dx += 1.0f;
+    });
+    EXPECT_EQ(pairs, 2);
+}
