@@ -49,14 +49,17 @@ ScriptHost::~ScriptHost() {
 void ScriptHost::register_with(Scene& scene) {
     unregister();
     m_scene_world = &scene.world();
+    m_world_alive = m_scene_world->alive_token();
     m_scene_world->on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
 }
 
 void ScriptHost::unregister() {
-    if (m_scene_world == nullptr)
-        return;
-    m_scene_world->on_destroy<ScriptComponent>().disconnect(this);
+    // A world destroyed before this host took the subscription with it; the
+    // pointer is dangling by then and must not be followed.
+    if (m_scene_world != nullptr && !m_world_alive.expired())
+        m_scene_world->on_destroy<ScriptComponent>().disconnect(this);
     m_scene_world = nullptr;
+    m_world_alive.reset();
 }
 
 void ScriptHost::on_script_destroyed(ecs::World& world, NodeId e) {

@@ -55,7 +55,9 @@ void Physics2D::shutdown() {
     // the components are now dangling. Clearing them matters for init() on the
     // same scene: sync_to_scene treats a non-null id as a live body, so it
     // would create nothing and then call b2Body_GetPosition on a dead handle.
-    if (m_scene_world != nullptr) {
+    // Only if the world is still there. This runs from the destructor too, and
+    // a scene declared after this object has already been destroyed by then.
+    if (scene_world_alive()) {
         m_scene_world->each<RigidBody2D>([](RigidBody2D& rb) { rb.body = b2_nullBodyId; });
         m_scene_world->each<BoxCollider2D>([](BoxCollider2D& col) { col.shape = b2_nullShapeId; });
     }
@@ -72,17 +74,21 @@ Physics2D::~Physics2D() {
 void Physics2D::register_with(Scene& scene) {
     unregister();
     m_scene_world = &scene.world();
+    m_world_alive = m_scene_world->alive_token();
     m_scene_world->on_destroy<RigidBody2D>().connect<&Physics2D::on_rb_destroyed>(*this);
     m_scene_world->on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
 }
 
 void Physics2D::unregister() {
-    if (m_scene_world == nullptr)
-        return;
-    // By instance: drops both subscriptions whichever member each one names.
-    m_scene_world->on_destroy<RigidBody2D>().disconnect(this);
-    m_scene_world->on_destroy<BoxCollider2D>().disconnect(this);
+    // A world that has already gone took the subscriptions with it, so there is
+    // nothing to drop and nothing safe to touch.
+    if (scene_world_alive()) {
+        // By instance: drops both subscriptions whichever member each names.
+        m_scene_world->on_destroy<RigidBody2D>().disconnect(this);
+        m_scene_world->on_destroy<BoxCollider2D>().disconnect(this);
+    }
     m_scene_world = nullptr;
+    m_world_alive.reset();
 }
 
 void Physics2D::on_rb_destroyed(ecs::World& scene_world, NodeId e) {

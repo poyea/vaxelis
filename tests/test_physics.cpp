@@ -124,3 +124,24 @@ TEST(Physics2D, StaticBodyDoesNotMove) {
 
     phys.shutdown();
 }
+
+TEST(Physics2D, OutlivingItsSceneIsSafe) {
+    // Declaration order decides destruction order, and this is the order that
+    // used to crash: the scene goes first, so the host's destructor must not
+    // follow its world pointer to unsubscribe or to clear handles.
+    Physics2D phys;
+    ASSERT_TRUE(phys.init({}));
+    {
+        Scene s;
+        phys.register_with(s);
+        auto e = s.create_node("Box");
+        s.add<RigidBody2D>(e);
+        s.add<BoxCollider2D>(e).half_extents = {4.0f, 4.0f};
+        phys.sync_to_scene(s);
+        ASSERT_FALSE(B2_IS_NULL(s.get<RigidBody2D>(e).body));
+    }
+    // The scene is gone; both of these have to be no-ops rather than faults.
+    phys.unregister();
+    phys.shutdown();
+    EXPECT_FALSE(phys.ready());
+}

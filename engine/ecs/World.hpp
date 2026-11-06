@@ -74,6 +74,19 @@ class World {
     /// call. Release what an entity owns while the world is still alive.
     template <class T> Sink on_destroy() { return Sink{signal_for<T>(m_on_destroy)}; }
 
+    /// A token that expires when this world is destroyed.
+    ///
+    /// A subscriber holds one beside its `World*` so that, at its own
+    /// destruction, it can tell whether the world it subscribed to is still
+    /// there. Subscriptions die with the world, so touching the pointer
+    /// afterwards -- even to unsubscribe -- is use-after-free, and a subsystem
+    /// cannot assume it outlives the scene: declaration order decides, and in
+    /// a test the scene is often the later local.
+    ///
+    /// Deliberately not carried across a move: it tracks this object, not its
+    /// contents, so each world keeps its own from construction.
+    std::weak_ptr<const void> alive_token() const { return m_alive; }
+
     /// Creates an entity with no components.
     Entity create();
 
@@ -376,6 +389,9 @@ class World {
     SignalTable m_on_destroy;
     /// Where subscriptions for an unregisterable type go to be ignored.
     Signal m_discarded;
+    /// Backs alive_token(); nothing reads through it. See that function for why
+    /// the move operations leave it alone.
+    std::shared_ptr<const void> m_alive{std::make_shared<char>()};
 };
 
 } // namespace vaxelis::ecs

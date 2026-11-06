@@ -73,6 +73,9 @@ class ScriptHost {
     /// The world register_with() subscribed to, so the destructor can
     /// unsubscribe. Null when nothing is subscribed.
     ecs::World* m_scene_world{nullptr};
+    /// Expires if that world is destroyed first. Checked before the pointer
+    /// above is dereferenced; see ecs::World::alive_token().
+    std::weak_ptr<const void> m_world_alive;
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;

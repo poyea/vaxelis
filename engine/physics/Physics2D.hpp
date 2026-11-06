@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include <box2d/box2d.h>
 
@@ -87,6 +88,15 @@ class Physics2D {
     /// The world register_with() subscribed to, so the destructor can
     /// unsubscribe. Null when nothing is subscribed.
     ecs::World* m_scene_world{nullptr};
+    /// Expires if that world is destroyed first, which it may well be: a scene
+    /// declared after this object is destroyed before it. Checked before the
+    /// pointer above is ever dereferenced.
+    std::weak_ptr<const void> m_world_alive;
+
+    /// True while the subscribed world is still alive and reachable.
+    bool scene_world_alive() const {
+        return m_scene_world != nullptr && !m_world_alive.expired();
+    }
 
     b2WorldId m_world{b2_nullWorldId};
     Config m_cfg{};
