@@ -142,8 +142,14 @@ void Scene::set_parent(NodeId e, NodeId new_parent) {
         return;
 
     // Cycle check: walk new_parent up to root, reject if e is on the path.
-    for (auto cur = new_parent; cur != kNoNode;) {
-        if (cur == e)
+    //
+    // Bounded by the node count, because the tree is only a tree as long as
+    // everyone goes through these helpers. A parent written directly into a
+    // Hierarchy can close a loop, and an unbounded walk would spin on it
+    // forever; any chain longer than every live node is such a loop.
+    size_t steps = m_world.size() + 1;
+    for (auto cur = new_parent; cur != kNoNode; --steps) {
+        if (cur == e || steps == 0)
             return;
         auto* h = try_get<Hierarchy>(cur);
         cur = h != nullptr ? h->parent : kNoNode;
@@ -159,11 +165,20 @@ void Scene::set_parent(NodeId e, NodeId new_parent) {
 mat4 Scene::world_matrix(NodeId e) const {
     if (!valid(e))
         return mat4(1.0f);
-    const auto* t = try_get<Transform2D>(e);
-    const auto* h = try_get<Hierarchy>(e);
-    mat4 m = t ? t->local_matrix() : mat4(1.0f);
-    if (h && h->parent != kNoNode)
-        m = world_matrix(h->parent) * m;
+
+    // Walks up to the root, folding each ancestor's local matrix in on the
+    // left, which is the same product the recursive form built. Iterative and
+    // bounded: this used to recurse once per level, so a Hierarchy carrying a
+    // parent cycle -- writable through get<Hierarchy>() -- overflowed the
+    // stack instead of returning.
+    mat4 m(1.0f);
+    size_t steps = m_world.size() + 1;
+    for (NodeId cur = e; valid(cur) && steps > 0; --steps) {
+        if (const auto* t = try_get<Transform2D>(cur))
+            m = t->local_matrix() * m;
+        const auto* h = try_get<Hierarchy>(cur);
+        cur = h != nullptr ? h->parent : kNoNode;
+    }
     return m;
 }
 
