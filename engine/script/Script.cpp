@@ -98,9 +98,14 @@ bool ScriptHost::init(Scene& scene, Input& input) {
     inp.set_function("released",
                      [this](const std::string& a) { return m_impl->input->released(a); });
 
-    // engine.scene.find_by_name(name) -> entity id (uint32_t, 0 if missing)
+    // engine.scene.find_by_name(name) -> node key. Opaque to Lua: hand it back
+    // to the other bindings, do not compute with it. A miss yields the key of
+    // kNoNode, which the other bindings read as a dead handle and ignore. The
+    // old comment here promised 0 for a miss and never delivered it -- the cast
+    // of a null handle is 0xffffffff -- and 0 is a perfectly good node id, so
+    // there is no in-band sentinel to promise.
     auto sc = engine["scene"].get_or_create<sol::table>();
-    sc.set_function("find_by_name", [this](const std::string& name) -> uint32_t {
+    sc.set_function("find_by_name", [this](const std::string& name) -> NodeKey {
         NodeId found = kNoNode;
         m_impl->scene->for_each([&](NodeId e) {
             if (found != kNoNode)
@@ -108,19 +113,18 @@ bool ScriptHost::init(Scene& scene, Input& input) {
             if (m_impl->scene->get<Name>(e).value == name)
                 found = e;
         });
-        return static_cast<uint32_t>(found);
+        return node_key(found);
     });
-    sc.set_function("get_position", [this](uint32_t id) -> vec2 {
-        const auto e = static_cast<NodeId>(id);
-        const Transform2D* t = m_impl->scene->try_get<Transform2D>(e);
+    sc.set_function("get_position", [this](NodeKey id) -> vec2 {
+        const Transform2D* t = m_impl->scene->try_get<Transform2D>(node_from_key(id));
         return t != nullptr ? t->position : vec2{0.0f};
     });
-    sc.set_function("set_position", [this](uint32_t id, vec2 p) {
-        if (Transform2D* t = m_impl->scene->try_get<Transform2D>(static_cast<NodeId>(id)))
+    sc.set_function("set_position", [this](NodeKey id, vec2 p) {
+        if (Transform2D* t = m_impl->scene->try_get<Transform2D>(node_from_key(id)))
             t->position = p;
     });
-    sc.set_function("translate", [this](uint32_t id, vec2 d) {
-        if (Transform2D* t = m_impl->scene->try_get<Transform2D>(static_cast<NodeId>(id)))
+    sc.set_function("translate", [this](NodeKey id, vec2 d) {
+        if (Transform2D* t = m_impl->scene->try_get<Transform2D>(node_from_key(id)))
             t->position += d;
     });
     return true;
@@ -141,7 +145,7 @@ void ScriptHost::update(float dt, Scene& scene) {
             // Create the per-instance subtable, expose entity_id, then run the
             // script with that table as its `self`/environment-lite.
             m_impl->lua[sc.instance_key] =
-                m_impl->lua.create_table_with("entity_id", static_cast<uint32_t>(e));
+                m_impl->lua.create_table_with("entity_id", node_key(e));
             m_impl->instances.insert(sc.instance_key);
             sol::protected_function_result r =
                 m_impl->lua.safe_script_file(sc.path, sol::script_pass_on_error);

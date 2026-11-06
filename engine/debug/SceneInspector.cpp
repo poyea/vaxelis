@@ -60,8 +60,11 @@ void SceneInspector::draw_node_recursive(Scene& scene, NodeId e) {
     if (e == scene.root())
         flags |= ImGuiTreeNodeFlags_DefaultOpen;
 
-    const bool open = ImGui::TreeNodeEx(reinterpret_cast<void*>(static_cast<uintptr_t>(e)), flags,
-                                        "%s", name.c_str());
+    // A per-node widget id. Goes through NodeKey so it keeps working once the
+    // handle stops being an integer-shaped enum.
+    const auto widget_id = static_cast<uintptr_t>(node_key(e));
+    const bool open =
+        ImGui::TreeNodeEx(reinterpret_cast<void*>(widget_id), flags, "%s", name.c_str());
     if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen())
         m_selected = e;
     if (open) {
