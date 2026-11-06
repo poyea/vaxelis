@@ -94,9 +94,7 @@ class Physics2D {
     std::weak_ptr<const void> m_world_alive;
 
     /// True while the subscribed world is still alive and reachable.
-    bool scene_world_alive() const {
-        return m_scene_world != nullptr && !m_world_alive.expired();
-    }
+    bool scene_world_alive() const { return m_scene_world != nullptr && !m_world_alive.expired(); }
 
     b2WorldId m_world{b2_nullWorldId};
     Config m_cfg{};
