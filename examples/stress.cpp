@@ -103,8 +103,7 @@ class Stress final : public vaxelis::Application {
         // path -- iterating the view and calling get() per entity would add a
         // sparse->dense lookup each step and quietly slander it.
         const auto t_anim = SteadyClock::now();
-        m_scene.registry().view<vaxelis::Transform2D>().each(
-            [dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
+        m_scene.each<vaxelis::Transform2D>([dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
         m_anim.push(ms_since(t_anim));
 
         // Phase 2: the same entities, reached through the tree instead.
@@ -186,24 +185,23 @@ class Stress final : public vaxelis::Application {
 
         const auto t0 = SteadyClock::now();
         m_scene = vaxelis::Scene{};
-        auto& reg = m_scene.registry();
 
         const int per_level = std::max(1, m_nodes / m_depth);
         const float span = std::sqrt(static_cast<float>(per_level)) + 1.0f;
         const float spacing = 14.0f;
 
-        std::vector<entt::entity> prev{m_scene.root()};
-        std::vector<entt::entity> cur;
+        std::vector<vaxelis::NodeId> prev{m_scene.root()};
+        std::vector<vaxelis::NodeId> cur;
         cur.reserve(static_cast<size_t>(per_level));
 
         int made = 0;
         for (int level = 0; level < m_depth && made < m_nodes; ++level) {
             cur.clear();
             for (int i = 0; i < per_level && made < m_nodes; ++i, ++made) {
-                const entt::entity parent = prev[static_cast<size_t>(i) % prev.size()];
-                const entt::entity e = m_scene.create_node("n", parent);
+                const vaxelis::NodeId parent = prev[static_cast<size_t>(i) % prev.size()];
+                const vaxelis::NodeId e = m_scene.create_node("n", parent);
 
-                auto& tr = reg.get<vaxelis::Transform2D>(e);
+                auto& tr = m_scene.get<vaxelis::Transform2D>(e);
                 if (level == 0) {
                     // Level 0 lays out the grid; deeper levels are small local
                     // offsets, so each subtree renders as a visible cluster.
@@ -216,7 +214,7 @@ class Stress final : public vaxelis::Application {
                     tr.scale = {0.96f, 0.96f};
                 }
 
-                auto& sprite = reg.emplace<vaxelis::SpriteComponent>(e);
+                auto& sprite = m_scene.add<vaxelis::SpriteComponent>(e);
                 sprite.texture = m_texture;
                 sprite.size = {3.0f, 3.0f};
                 const float shade = static_cast<float>(level) / static_cast<float>(kMaxDepth);

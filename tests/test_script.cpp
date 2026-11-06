@@ -35,13 +35,13 @@ TEST(ScriptHost, DestroyingAnEntityTearsDownItsLuaInstance) {
     host.register_with(s);
 
     auto e = s.create_node("Scripted");
-    auto& sc = s.registry().emplace<ScriptComponent>(e);
+    auto& sc = s.add<ScriptComponent>(e);
     sc.path = write_temp_script("destroy");
 
     host.update(1.0f / 60.0f, s);
     EXPECT_EQ(host.instance_count(), 1u);
 
-    const std::string key = s.registry().get<ScriptComponent>(e).instance_key;
+    const std::string key = s.get<ScriptComponent>(e).instance_key;
     EXPECT_FALSE(key.empty());
     EXPECT_TRUE(host.has_instance(key));
 
@@ -62,13 +62,13 @@ TEST(ScriptHost, ErasingTheScriptComponentTearsDownItsLuaInstance) {
     host.register_with(s);
 
     auto e = s.create_node("Scripted");
-    s.registry().emplace<ScriptComponent>(e).path = write_temp_script("erase");
+    s.add<ScriptComponent>(e).path = write_temp_script("erase");
 
     host.update(1.0f / 60.0f, s);
-    const std::string key = s.registry().get<ScriptComponent>(e).instance_key;
+    const std::string key = s.get<ScriptComponent>(e).instance_key;
     EXPECT_TRUE(host.has_instance(key));
 
-    s.registry().remove<ScriptComponent>(e);
+    s.remove<ScriptComponent>(e);
 
     EXPECT_FALSE(host.has_instance(key));
     EXPECT_EQ(host.instance_count(), 0u);

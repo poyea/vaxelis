@@ -78,7 +78,6 @@ class Orbits final : public vaxelis::Application {
     }
 
     void on_fixed_update(float dt) override {
-        auto& reg = m_scene.registry();
         const size_t n = m_bodies.size();
 
         // Gather the hot state into flat arrays once per step: the O(N^2) pass
@@ -87,9 +86,9 @@ class Orbits final : public vaxelis::Application {
         m_pos.clear();
         m_vel.clear();
         m_mass.clear();
-        for (const entt::entity e : m_bodies) {
-            m_pos.push_back(reg.get<vaxelis::Transform2D>(e).position);
-            const Body& b = reg.get<Body>(e);
+        for (const vaxelis::NodeId e : m_bodies) {
+            m_pos.push_back(m_scene.get<vaxelis::Transform2D>(e).position);
+            const Body& b = m_scene.get<Body>(e);
             m_vel.push_back(b.vel);
             m_mass.push_back(b.mass);
         }
@@ -121,8 +120,8 @@ class Orbits final : public vaxelis::Application {
         m_barycentre = total_mass > 0.0f ? weighted / total_mass : vaxelis::vec2{0.0f, 0.0f};
 
         for (size_t i = 0; i < n; ++i) {
-            reg.get<vaxelis::Transform2D>(m_bodies[i]).position = m_pos[i];
-            reg.get<Body>(m_bodies[i]).vel = m_vel[i];
+            m_scene.get<vaxelis::Transform2D>(m_bodies[i]).position = m_pos[i];
+            m_scene.get<Body>(m_bodies[i]).vel = m_vel[i];
             m_trail[i * kTrail + m_head] = m_pos[i];
         }
         m_head = (m_head + 1) % kTrail;
@@ -168,25 +167,24 @@ class Orbits final : public vaxelis::Application {
     /// Creates the star and the planets once; reseeding only rewrites their
     /// state, so no entity is ever churned at runtime.
     void spawn() {
-        auto& reg = m_scene.registry();
         m_bodies.reserve(kPlanets + 1);
 
-        const entt::entity star = m_scene.create_node("Star");
-        auto& star_sprite = reg.emplace<vaxelis::SpriteComponent>(star);
+        const vaxelis::NodeId star = m_scene.create_node("Star");
+        auto& star_sprite = m_scene.add<vaxelis::SpriteComponent>(star);
         star_sprite.texture = m_texture;
         star_sprite.size = {22.0f, 22.0f};
         star_sprite.color = {1.0f, 0.93f, 0.65f, 1.0f};
         star_sprite.z_order = 1;
-        reg.emplace<Body>(star).mass = kStarMass;
+        m_scene.add<Body>(star).mass = kStarMass;
         m_bodies.push_back(star);
 
         for (uint32_t i = 0; i < kPlanets; ++i) {
-            const entt::entity e = m_scene.create_node("Planet");
-            auto& sprite = reg.emplace<vaxelis::SpriteComponent>(e);
+            const vaxelis::NodeId e = m_scene.create_node("Planet");
+            auto& sprite = m_scene.add<vaxelis::SpriteComponent>(e);
             sprite.texture = m_texture;
             sprite.size = {5.0f, 5.0f};
             sprite.z_order = 1;
-            reg.emplace<Body>(e);
+            m_scene.add<Body>(e);
             m_bodies.push_back(e);
         }
 
@@ -198,32 +196,31 @@ class Orbits final : public vaxelis::Application {
     }
 
     void reseed() {
-        auto& reg = m_scene.registry();
-        reg.get<vaxelis::Transform2D>(m_bodies[0]).position = {0.0f, 0.0f};
-        reg.get<Body>(m_bodies[0]).vel = {0.0f, 0.0f};
+        m_scene.get<vaxelis::Transform2D>(m_bodies[0]).position = {0.0f, 0.0f};
+        m_scene.get<Body>(m_bodies[0]).vel = {0.0f, 0.0f};
 
         std::uniform_real_distribution<float> radius(110.0f, 520.0f);
         std::uniform_real_distribution<float> angle(0.0f, kTau);
         std::uniform_real_distribution<float> mass(1.0f, 5.0f);
 
         for (size_t i = 1; i < m_bodies.size(); ++i) {
-            const entt::entity e = m_bodies[i];
+            const vaxelis::NodeId e = m_bodies[i];
             const float r = radius(m_rng);
             const float a = angle(m_rng);
             const vaxelis::vec2 dir{std::cos(a), std::sin(a)};
 
-            reg.get<vaxelis::Transform2D>(e).position = dir * r;
-            auto& body = reg.get<Body>(e);
+            m_scene.get<vaxelis::Transform2D>(e).position = dir * r;
+            auto& body = m_scene.get<Body>(e);
             // Circular-orbit speed for the star alone, perpendicular to the
             // radius; the other planets are what perturb it from there.
             body.vel = vaxelis::vec2{-dir.y, dir.x} * std::sqrt(kG * kStarMass / r);
             body.mass = mass(m_rng);
-            reg.get<vaxelis::SpriteComponent>(e).color = ramp((r - 110.0f) / 410.0f);
+            m_scene.get<vaxelis::SpriteComponent>(e).color = ramp((r - 110.0f) / 410.0f);
         }
 
         // Seed every trail with the spawn position so no stale streak survives.
         for (size_t i = 0; i < m_bodies.size(); ++i) {
-            const vaxelis::vec2 p = reg.get<vaxelis::Transform2D>(m_bodies[i]).position;
+            const vaxelis::vec2 p = m_scene.get<vaxelis::Transform2D>(m_bodies[i]).position;
             std::fill_n(m_trail.data() + i * kTrail, kTrail, p);
         }
         m_head = 0;
@@ -232,12 +229,11 @@ class Orbits final : public vaxelis::Application {
 
     /// Ring-buffer trails, oldest sample first so alpha ramps up to the head.
     void draw_trails() {
-        auto& reg = m_scene.registry();
         const vaxelis::vec2 size{2.0f, 2.0f};
         const float inv_age = 1.0f / static_cast<float>(kTrail - 1);
 
         for (size_t i = 0; i < m_bodies.size(); ++i) {
-            vaxelis::vec4 tint = reg.get<vaxelis::SpriteComponent>(m_bodies[i]).color;
+            vaxelis::vec4 tint = m_scene.get<vaxelis::SpriteComponent>(m_bodies[i]).color;
             for (uint32_t k = 0; k < kTrail; ++k) {
                 const uint32_t slot = (m_head + k) % kTrail;
                 tint.a = 0.45f * static_cast<float>(k) * inv_age;
@@ -252,7 +248,7 @@ class Orbits final : public vaxelis::Application {
     vaxelis::Camera2D m_camera;
     vaxelis::rhi::TextureHandle m_texture{};
 
-    std::vector<entt::entity> m_bodies;
+    std::vector<vaxelis::NodeId> m_bodies;
     std::vector<vaxelis::vec2> m_pos;
     std::vector<vaxelis::vec2> m_vel;
     std::vector<vaxelis::vec2> m_acc;
