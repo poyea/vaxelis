@@ -134,6 +134,12 @@ static bool from_json_unguarded(Scene& s, std::string_view jtext) {
         by_token[token] = e;
     }
 
+    // Pass one refused to create a node for a repeated id, but both entries are
+    // still in the array and both resolve to the surviving node, so without
+    // this the later entry would write its parent, transform and sprite over
+    // the node that kept the id -- the merge the rejection was meant to stop.
+    std::unordered_set<std::string> populated;
+
     for (const auto& node : j["nodes"]) {
         if (!node.contains("id"))
             continue;
@@ -142,6 +148,8 @@ static bool from_json_unguarded(Scene& s, std::string_view jtext) {
             continue;
         auto it = by_token.find(token);
         if (it == by_token.end())
+            continue;
+        if (!populated.insert(token).second)
             continue;
         auto e = it->second;
 
