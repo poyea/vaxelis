@@ -9,12 +9,12 @@
 /// `dfs/flat` is what the scene graph costs over a flat sweep of the same
 /// nodes.
 ///
-/// `arch/flat` no longer compares two storage engines: since the port, the
-/// scene *is* an archetype world, so this measures a scene node (Id, Name,
-/// Hierarchy, Transform2D, WorldTransform2D, often SpriteComponent) against a
-/// mirror holding Transform2D alone. It is the cost of archetype width, not of
-/// archetype versus sparse set. For that comparison, which still runs entt
-/// directly, see benchmarks/ecs_bench.
+/// `width` does not compare two storage engines: since the port, the scene
+/// *is* an archetype world, so it measures a sweep over a scene node (Id, Name,
+/// Hierarchy, Transform2D, WorldTransform2D, often SpriteComponent) against one
+/// over a mirror holding Transform2D alone. It is the cost of archetype width.
+/// For archetype against sparse set, which still runs entt directly, see
+/// benchmarks/ecs_bench.
 ///
 /// render_sprites() refreshes world transforms itself, so subtract `transform`
 /// from `render` to get the gather/sort/submit cost alone.
@@ -147,18 +147,18 @@ class Stress final : public vaxelis::Application {
         ImGui::Text("build      %.1f ms scene / %.1f ms ecs (one off)",
                     static_cast<double>(m_build_ms), static_cast<double>(m_ecs_build_ms));
         ImGui::Separator();
-        ImGui::Text("animate    %.3f ms   flat view<Transform2D>",
+        ImGui::Text("animate    %.3f ms   flat each<Transform2D> over the scene",
                     static_cast<double>(m_anim.mean()));
         ImGui::Text("transform  %.3f ms   hierarchy DFS",
                     static_cast<double>(m_transform.mean()));
         ImGui::Text("render     %.3f ms   gather + sort + submit",
                     static_cast<double>(m_render.mean()));
-        ImGui::Text("archetype  %.3f ms   ecs::World each<Transform2D>",
+        ImGui::Text("mirror     %.3f ms   each<Transform2D> over a bare world",
                     static_cast<double>(m_archetype.mean()));
         ImGui::Separator();
-        ImGui::Text("dfs/flat   %.2fx     scene graph vs sparse-set sweep",
+        ImGui::Text("dfs/flat   %.2fx     scene graph vs flat sweep",
                     static_cast<double>(ratio(m_transform, m_anim)));
-        ImGui::Text("arch/flat  %.2fx     narrow mirror vs scene width (<1 wins)",
+        ImGui::Text("width      %.2fx     bare world vs scene node (<1 wins)",
                     static_cast<double>(ratio(m_archetype, m_anim)));
         ImGui::Separator();
         ImGui::Text("quads      %u in %u draw calls", m_batch.quads(), m_batch.draw_calls());
