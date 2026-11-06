@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include <box2d/box2d.h>
+
 #include "engine/ecs/World.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/scene/NodeId.hpp"
