@@ -2,6 +2,8 @@
 // Copyright (c) 2026 John Law
 
 #include <algorithm>
+#include <cmath>
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -244,4 +246,63 @@ TEST(Scene, ForEachSkipsChildrenDestroyedThroughTheWorld) {
     int visited = 0;
     s.for_each([&](NodeId) { ++visited; });
     EXPECT_EQ(visited, 2); // root and A
+}
+
+TEST(Scene, HierarchyCycleWrittenDirectlyDoesNotHang) {
+    Scene s;
+    auto a = s.create_node("A");
+    auto b = s.create_node("B", a);
+    auto c = s.create_node("C");
+
+    // Writing a parent straight into the component skips every invariant the
+    // helpers keep, and closes a loop: A.parent == B, B.parent == A.
+    s.get<Hierarchy>(a).parent = b;
+
+    // Both of these used to walk the loop forever -- set_parent spinning, and
+    // world_matrix recursing until the stack died.
+    s.set_parent(c, a);
+    const auto m = s.world_matrix(a);
+
+    // The guard refuses rather than guessing, so C keeps the parent it had.
+    EXPECT_EQ(s.get<Hierarchy>(c).parent, s.root());
+    // And the matrix comes back finite rather than never coming back.
+    EXPECT_TRUE(std::isfinite(m[3].x));
+    EXPECT_TRUE(std::isfinite(m[3].y));
+}
+
+TEST(Scene, DuplicateNodeIdsDoNotMergeTwoNodes) {
+    const std::string json = R"({"nodes":[
+        {"id":"11111111-1111-1111-1111-111111111111","name":"First",
+         "transform":{"pos":[1.0,0.0],"rot":0.0,"scale":[1.0,1.0]}},
+        {"id":"11111111-1111-1111-1111-111111111111","name":"Second",
+         "transform":{"pos":[9.0,0.0],"rot":0.0,"scale":[1.0,1.0]}}
+    ]})";
+
+    Scene s;
+    ASSERT_TRUE(scene_io::from_json(s, json));
+
+    // The repeat is dropped, so the survivor keeps its own transform rather
+    // than collecting the other's.
+    int nodes = 0;
+    float x = 0.0f;
+    s.for_each([&](NodeId e) {
+        if (e == s.root())
+            return;
+        ++nodes;
+        x = s.get<Transform2D>(e).position.x;
+    });
+    EXPECT_EQ(nodes, 1);
+    EXPECT_FLOAT_EQ(x, 1.0f);
+}
+
+TEST(Scene, FromJsonReturnsFalseOnAWrongTypedField) {
+    // "rot" is a string where a number belongs: nlohmann throws, and that used
+    // to escape a function whose signature promises a bool.
+    const std::string json = R"({"nodes":[
+        {"id":"22222222-2222-2222-2222-222222222222","name":"Bad",
+         "transform":{"pos":[1.0,0.0],"rot":"not a number","scale":[1.0,1.0]}}
+    ]})";
+
+    Scene s;
+    EXPECT_FALSE(scene_io::from_json(s, json));
 }

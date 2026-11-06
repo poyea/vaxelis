@@ -701,3 +701,36 @@ TEST(World, CreateCanCloneAComponentFromTheSameArchetype) {
     }
     EXPECT_EQ(w.size(), 65u);
 }
+
+namespace {
+
+/// Adds a second component when told the first is going away, which is the case
+/// a snapshot of the entity's shape would miss.
+struct Grafter {
+    int pos_destroyed{0};
+    int health_destroyed{0};
+
+    void on_pos_destroyed(World& w, Entity e) {
+        ++pos_destroyed;
+        w.add<Health>(e, Health{7});
+    }
+
+    void on_health_destroyed(World&, Entity) { ++health_destroyed; }
+};
+
+} // namespace
+
+TEST(WorldSignals, DestroyAnnouncesAComponentAListenerAddsOnTheWayOut) {
+    World w;
+    Grafter grafter;
+    w.on_destroy<Pos>().connect<&Grafter::on_pos_destroyed>(grafter);
+    w.on_destroy<Health>().connect<&Grafter::on_health_destroyed>(grafter);
+
+    w.destroy(w.create(Pos{1.0f, 0.0f}));
+
+    EXPECT_EQ(grafter.pos_destroyed, 1);
+    // Without the re-scan this is 0: the Health would be dropped with the row
+    // and whatever it owned would leak.
+    EXPECT_EQ(grafter.health_destroyed, 1);
+    EXPECT_EQ(w.size(), 0u);
+}
