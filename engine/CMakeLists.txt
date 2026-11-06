@@ -37,7 +37,6 @@ target_link_libraries(vaxelis_engine
         glm::glm
         spdlog::spdlog
         imgui   # transitively used by debug overlay code in clients
-        entt    # public — components live in headers clients include
         box2d   # public — physics components expose b2*Id handles
     PRIVATE
         stb

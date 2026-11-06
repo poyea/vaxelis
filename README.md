@@ -4,7 +4,7 @@ A C++26 hybrid, cross-platform 2D/3D game engine.
 
 ## Stack
 
-SDL3 · OpenGL 4.5 · glm · Dear ImGui · spdlog · stb · miniaudio · entt · nlohmann/json · Box2D · Lua 5.4 · sol2
+SDL3 · OpenGL 4.5 · glm · Dear ImGui · spdlog · stb · miniaudio · nlohmann/json · Box2D · Lua 5.4 · sol2
 
 ## Build
 
