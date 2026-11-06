@@ -26,6 +26,7 @@ add_library(vaxelis_engine STATIC
     text/Font.cpp
     tilemap/TiledMap.cpp
     debug/ImGuiLayer.cpp
+    debug/Profiler.cpp
     debug/SceneInspector.cpp
 )
 
