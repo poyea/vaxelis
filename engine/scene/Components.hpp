@@ -14,6 +14,18 @@
 
 namespace vaxelis {
 
+/// Handle for one scene node.
+///
+/// An alias for entt's entity while the scene is stored in an entt::registry.
+/// The archetype port swaps it for `ecs::Entity`, so code that spells this name
+/// instead of `entt::entity` needs no edit when that happens. Prefer it, and
+/// prefer the typed accessors on Scene over reaching for registry().
+using NodeId = entt::entity;
+
+/// The handle that refers to no node. Use in place of `entt::null`.
+inline constexpr NodeId kNoNode = static_cast<NodeId>(entt::null);
+
+
 /// Stable identity. Assigned once at node creation and preserved across
 /// save/load, so references survive reordering and stay unique across merges.
 /// (entt handles, by contrast, are reused and per-registry.)
@@ -27,11 +39,11 @@ struct Name {
     std::string value{"Node"};
 };
 
-/// Scene-graph link. Roots have `parent == entt::null`. Children list is kept
+/// Scene-graph link. Roots have `parent == kNoNode`. Children list is kept
 /// in insertion order; reordering is a UX concern, not stored here.
 struct Hierarchy {
-    entt::entity parent{entt::null};
-    std::vector<entt::entity> children;
+    NodeId parent{kNoNode};
+    std::vector<NodeId> children;
 };
 
 /// 2D transform. Local space relative to parent.

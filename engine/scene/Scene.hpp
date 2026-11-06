@@ -8,6 +8,7 @@
 #include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <entt/entt.hpp>
@@ -47,33 +48,37 @@ class Scene {
     void swap(Scene& other) noexcept;
 
     /// Direct registry access; see the class note about hierarchy invariants.
+    ///
+    /// Being retired: it names the storage, so every use of it is a site the
+    /// archetype port has to rewrite by hand. New code goes through the typed
+    /// accessors below, which the port can redirect in one place.
     entt::registry& registry() { return m_registry; }
-    /// Read-only registry access, for systems that only query.
+    /// Read-only registry access, for systems that only query. See registry().
     const entt::registry& registry() const { return m_registry; }
     /// The implicit root entity that parents all top-level nodes.
-    entt::entity root() const { return m_root; }
+    NodeId root() const { return m_root; }
 
     /// Creates a node with an Id + Name + Hierarchy + Transform2D. Parent
     /// defaults to root. A fresh Uuid is generated unless `uuid` is valid, in
     /// which case it is adopted (used by deserialization to restore identity).
     /// Caller adds extra components via registry().emplace<>.
-    entt::entity create_node(std::string name, entt::entity parent = entt::null, Uuid uuid = {});
+    NodeId create_node(std::string name, NodeId parent = kNoNode, Uuid uuid = {});
 
-    /// Finds the node carrying `uuid`, or entt::null. O(N) scan, intended for
+    /// Finds the node carrying `uuid`, or kNoNode. O(N) scan, intended for
     /// load/merge wiring, not per-frame use.
-    entt::entity find_by_uuid(const Uuid& uuid) const;
+    NodeId find_by_uuid(const Uuid& uuid) const;
 
     /// Destroys `e` and all descendants. Removes the entry from the parent's
     /// child list. No-op if `e` is null or already destroyed.
-    void destroy_node(entt::entity e);
+    void destroy_node(NodeId e);
 
     /// Reparents `e` under `new_parent` (or root if null). Cycles are rejected.
-    void set_parent(entt::entity e, entt::entity new_parent);
+    void set_parent(NodeId e, NodeId new_parent);
 
     /// One-shot world transform; walks parents to the root. O(depth). Prefer
     /// the cached WorldTransform2D component refreshed by update_world_transforms
     /// for the common per-frame case.
-    mat4 world_matrix(entt::entity e) const;
+    mat4 world_matrix(NodeId e) const;
 
     /// Writes WorldTransform2D into every node reachable from the root. O(N),
     /// a single forward pass over a cached depth-ordered node list rather than
@@ -82,9 +87,68 @@ class Scene {
     /// render_sprites calls this implicitly.
     void update_world_transforms();
 
+    // --- component access -------------------------------------------------
+    // The typed face over the storage. Written so call sites name Scene rather
+    // than the registry: the archetype port changes what is underneath these,
+    // and anything that went through registry() directly has to be rewritten
+    // by hand. Semantics match the entt calls they wrap.
+
+    /// True while `e` refers to a live node.
+    bool valid(NodeId e) const { return e != kNoNode && m_registry.valid(e); }
+
+    /// True when `e` carries a `T`.
+    template <class T> bool has(NodeId e) const {
+        return valid(e) && m_registry.try_get<T>(e) != nullptr;
+    }
+
+    /// Gives `e` a `T`, built from `args`, replacing any it already had.
+    template <class T, class... Args> T& add(NodeId e, Args&&... args) {
+        return m_registry.emplace_or_replace<T>(e, std::forward<Args>(args)...);
+    }
+
+    /// `e`'s `T`. Asserts in the storage if it has none; use try_get() when
+    /// that is in question.
+    template <class T> T& get(NodeId e) { return m_registry.get<T>(e); }
+    /// Read-only overload of get().
+    template <class T> const T& get(NodeId e) const { return m_registry.get<T>(e); }
+
+    /// `e`'s `T`, or nullptr when it has none or the handle is stale.
+    template <class T> T* try_get(NodeId e) {
+        return valid(e) ? m_registry.try_get<T>(e) : nullptr;
+    }
+    /// Read-only overload of try_get().
+    template <class T> const T* try_get(NodeId e) const {
+        return valid(e) ? m_registry.try_get<T>(e) : nullptr;
+    }
+
+    /// Takes `T` away from `e`. A no-op when it has none.
+    template <class T> void remove(NodeId e) {
+        if (valid(e))
+            m_registry.remove<T>(e);
+    }
+
+    /// Calls `fn(T&...)` for every node carrying all of `Ts`. Query types may
+    /// be const-qualified to ask for read-only access.
+    template <class... Ts, class Fn> void each(Fn&& fn) {
+        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+    }
+    /// Read-only overload of each().
+    template <class... Ts, class Fn> void each(Fn&& fn) const {
+        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+    }
+
+    /// Like each(), but `fn` takes the node handle first.
+    template <class... Ts, class Fn> void each_node(Fn&& fn) {
+        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+    }
+    /// Read-only overload of each_node().
+    template <class... Ts, class Fn> void each_node(Fn&& fn) const {
+        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+    }
+
     /// Depth-first traversal in child order. Visitor is called for each entity
     /// including the root.
-    void for_each(const std::function<void(entt::entity)>& visit) const;
+    void for_each(const std::function<void(NodeId)>& visit) const;
 
     /// Render every visible sprite with its world transform applied. Sprites
     /// with !texture.valid() are skipped (texture resolution is the host's job).
@@ -100,19 +164,19 @@ class Scene {
     /// precedes its children and its world matrix is ready by the time the
     /// child is reached.
     struct OrderEntry {
-        entt::entity entity{entt::null};
+        NodeId entity{kNoNode};
         size_t parent{kNoParent};
     };
 
     /// One sprite awaiting its draw call, carrying the keys it is sorted by.
     struct SpriteDrawItem {
-        entt::entity entity{entt::null};
+        NodeId entity{kNoNode};
         int z_order{0};
         uint32_t texture{0};
     };
 
-    void destroy_recursive(entt::entity e);
-    void detach_from_parent(entt::entity e);
+    void destroy_recursive(NodeId e);
+    void detach_from_parent(NodeId e);
 
     /// Installs the Hierarchy listeners and mints the root.
     void init_root();
@@ -127,14 +191,14 @@ class Scene {
     void rebind_listeners(Scene& previous);
 
     /// Listener signature required by entt; both signals land here.
-    void mark_order_dirty(entt::registry& reg, entt::entity e);
+    void mark_order_dirty(entt::registry& reg, NodeId e);
 
     /// Recomputes m_order from the hierarchy. Called lazily from
     /// update_world_transforms when a structural edit has invalidated it.
     void rebuild_order();
 
     entt::registry m_registry;
-    entt::entity m_root{entt::null};
+    NodeId m_root{kNoNode};
 
     std::vector<OrderEntry> m_order;
     /// World matrix per m_order slot, so a child reads its parent's result by

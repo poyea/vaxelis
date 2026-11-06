@@ -66,12 +66,12 @@ void Scene::rebind_listeners(Scene& previous) {
     connect_listeners();
 }
 
-void Scene::mark_order_dirty(entt::registry&, entt::entity) {
+void Scene::mark_order_dirty(entt::registry&, NodeId) {
     m_order_dirty = true;
 }
 
-entt::entity Scene::create_node(std::string name, entt::entity parent, Uuid uuid) {
-    if (parent == entt::null)
+NodeId Scene::create_node(std::string name, NodeId parent, Uuid uuid) {
+    if (parent == kNoNode)
         parent = m_root;
     auto e = m_registry.create();
     m_registry.emplace<Id>(e, Id{uuid.valid() ? uuid : generate_uuid()});
@@ -84,25 +84,25 @@ entt::entity Scene::create_node(std::string name, entt::entity parent, Uuid uuid
     return e;
 }
 
-entt::entity Scene::find_by_uuid(const Uuid& uuid) const {
+NodeId Scene::find_by_uuid(const Uuid& uuid) const {
     if (!uuid.valid())
-        return entt::null;
+        return kNoNode;
     for (auto e : m_registry.view<const Id>())
         if (m_registry.get<const Id>(e).uuid == uuid)
             return e;
-    return entt::null;
+    return kNoNode;
 }
 
-void Scene::detach_from_parent(entt::entity e) {
+void Scene::detach_from_parent(NodeId e) {
     auto* h = m_registry.try_get<Hierarchy>(e);
-    if (!h || h->parent == entt::null)
+    if (!h || h->parent == kNoNode)
         return;
     auto& parent_h = m_registry.get<Hierarchy>(h->parent);
     std::erase(parent_h.children, e);
-    h->parent = entt::null;
+    h->parent = kNoNode;
 }
 
-void Scene::destroy_recursive(entt::entity e) {
+void Scene::destroy_recursive(NodeId e) {
     auto* h = m_registry.try_get<Hierarchy>(e);
     if (h) {
         // Copy because destroy invalidates the child list.
@@ -113,27 +113,27 @@ void Scene::destroy_recursive(entt::entity e) {
     m_registry.destroy(e);
 }
 
-void Scene::destroy_node(entt::entity e) {
-    if (e == entt::null || e == m_root || !m_registry.valid(e))
+void Scene::destroy_node(NodeId e) {
+    if (e == kNoNode || e == m_root || !m_registry.valid(e))
         return;
     detach_from_parent(e);
     destroy_recursive(e);
 }
 
-void Scene::set_parent(entt::entity e, entt::entity new_parent) {
-    if (e == entt::null || e == m_root)
+void Scene::set_parent(NodeId e, NodeId new_parent) {
+    if (e == kNoNode || e == m_root)
         return;
-    if (new_parent == entt::null)
+    if (new_parent == kNoNode)
         new_parent = m_root;
     if (new_parent == e)
         return;
 
     // Cycle check: walk new_parent up to root, reject if e is on the path.
-    for (auto cur = new_parent; cur != entt::null;) {
+    for (auto cur = new_parent; cur != kNoNode;) {
         if (cur == e)
             return;
         auto* h = m_registry.try_get<Hierarchy>(cur);
-        cur = h ? h->parent : entt::null;
+        cur = h ? h->parent : kNoNode;
     }
 
     detach_from_parent(e);
@@ -144,8 +144,8 @@ void Scene::set_parent(entt::entity e, entt::entity new_parent) {
     m_order_dirty = true;
 }
 
-mat4 Scene::world_matrix(entt::entity e) const {
-    if (e == entt::null || !m_registry.valid(e))
+mat4 Scene::world_matrix(NodeId e) const {
+    if (e == kNoNode || !m_registry.valid(e))
         return mat4(1.0f);
     // Prefer cached value if update_world_transforms was called this frame.
     if (const auto* w = m_registry.try_get<WorldTransform2D>(e))
@@ -153,7 +153,7 @@ mat4 Scene::world_matrix(entt::entity e) const {
     const auto* t = m_registry.try_get<Transform2D>(e);
     const auto* h = m_registry.try_get<Hierarchy>(e);
     mat4 m = t ? t->local_matrix() : mat4(1.0f);
-    if (h && h->parent != entt::null)
+    if (h && h->parent != kNoNode)
         m = world_matrix(h->parent) * m;
     return m;
 }
@@ -162,7 +162,7 @@ void Scene::rebuild_order() {
     m_order.clear();
     // Iterative DFS: an explicit stack keeps a deep tree off the call stack.
     // Children are pushed in reverse so they pop back in authoring order.
-    std::vector<std::pair<entt::entity, size_t>> stack;
+    std::vector<std::pair<NodeId, size_t>> stack;
     stack.emplace_back(m_root, kNoParent);
     while (!stack.empty()) {
         const auto [e, parent] = stack.back();
@@ -201,8 +201,8 @@ void Scene::update_world_transforms() {
     }
 }
 
-void Scene::for_each(const std::function<void(entt::entity)>& visit) const {
-    auto walk = [&](auto& self, entt::entity e) -> void {
+void Scene::for_each(const std::function<void(NodeId)>& visit) const {
+    auto walk = [&](auto& self, NodeId e) -> void {
         visit(e);
         const auto* h = m_registry.try_get<Hierarchy>(e);
         if (!h)
