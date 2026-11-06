@@ -74,25 +74,25 @@ void step(AnimationComponent& a) {
 } // namespace
 
 void update_animations(Scene& scene, float dt) {
-    scene.each<AnimationComponent, SpriteComponent>([dt](AnimationComponent& anim,
-                                                         SpriteComponent& sprite) {
-        if (anim.frames.empty())
-            return;
+    scene.each<AnimationComponent, SpriteComponent>(
+        [dt](AnimationComponent& anim, SpriteComponent& sprite) {
+            if (anim.frames.empty())
+                return;
 
-        if (anim.playing && anim.fps > 0.0f) {
-            const float per_frame = 1.0f / anim.fps;
-            anim.elapsed += dt;
-            // A long dt must not skip frames silently, so drain it a frame at
-            // a time rather than jumping straight to the end.
-            while (anim.elapsed >= per_frame && anim.playing) {
-                anim.elapsed -= per_frame;
-                step(anim);
+            if (anim.playing && anim.fps > 0.0f) {
+                const float per_frame = 1.0f / anim.fps;
+                anim.elapsed += dt;
+                // A long dt must not skip frames silently, so drain it a frame
+                // at a time rather than jumping straight to the end.
+                while (anim.elapsed >= per_frame && anim.playing) {
+                    anim.elapsed -= per_frame;
+                    step(anim);
+                }
             }
-        }
 
-        if (anim.frame < anim.frames.size())
-            sprite.uv_rect = anim.frames[anim.frame];
-    });
+            if (anim.frame < anim.frames.size())
+                sprite.uv_rect = anim.frames[anim.frame];
+        });
 }
 
 } // namespace vaxelis
