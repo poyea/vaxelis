@@ -129,7 +129,7 @@ void Physics2D::sync_to_scene(Scene& scene) {
     //    skipped since they're authored, not simulated.
     scene.each<RigidBody2D, Transform2D>([&](RigidBody2D& rb, Transform2D& tr) {
         if (rb.type == BodyType::Static)
-            continue;
+            return;
         if (B2_IS_NULL(rb.body))
             return;
         const b2Vec2 p = b2Body_GetPosition(rb.body);

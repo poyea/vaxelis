@@ -57,7 +57,7 @@ std::string to_json(const Scene& s, int indent) {
             {"scale", save_vec2(t.scale)},
         };
 
-        if (const auto* sp = reg.try_get<SpriteComponent>(e)) {
+        if (const auto* sp = s.try_get<SpriteComponent>(e)) {
             node["sprite"] = {
                 {"texture_key", sp->texture_key},
                 {"size", save_vec2(sp->size)},
