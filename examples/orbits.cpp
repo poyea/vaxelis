@@ -15,7 +15,6 @@
 #include <vector>
 
 #include <SDL3/SDL_scancode.h>
-#include <entt/entt.hpp>
 #include <imgui.h>
 
 #include "engine/assets/AssetCache.hpp"

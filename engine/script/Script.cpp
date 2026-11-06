@@ -42,15 +42,18 @@ ScriptHost::~ScriptHost() {
 }
 
 void ScriptHost::register_with(Scene& scene) {
-    scene.registry().on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
+    scene.world().on_destroy<ScriptComponent>().connect<&ScriptHost::on_script_destroyed>(*this);
 }
 
-void ScriptHost::on_script_destroyed(entt::registry& reg, NodeId e) {
-    // The registry can outlive the host (teardown ordering); only touch the
-    // Lua state while it's still alive.
+void ScriptHost::on_script_destroyed(ecs::World& world, NodeId e) {
+    // The world can outlive the host (teardown ordering); only touch the Lua
+    // state while it is still alive.
     if (!m_impl->lua_alive)
         return;
-    const auto& sc = reg.get<ScriptComponent>(e);
+    const ScriptComponent* sc_slot = world.try_get<ScriptComponent>(e);
+    if (sc_slot == nullptr)
+        return;
+    const ScriptComponent& sc = *sc_slot;
     if (sc.instance_key.empty())
         return;
     m_impl->lua[sc.instance_key] = sol::lua_nil; // drop the subtable -> collectable
@@ -131,12 +134,9 @@ bool ScriptHost::init(Scene& scene, Input& input) {
 }
 
 void ScriptHost::update(float dt, Scene& scene) {
-    auto& reg = scene.registry();
-    auto view = reg.view<ScriptComponent>();
-    for (auto e : view) {
-        auto& sc = view.get<ScriptComponent>(e);
+    scene.each_node<ScriptComponent>([&](NodeId e, ScriptComponent& sc) {
         if (sc.path.empty())
-            continue;
+            return;
 
         if (!sc.loaded) {
             if (sc.instance_key.empty()) {
@@ -152,7 +152,7 @@ void ScriptHost::update(float dt, Scene& scene) {
                 sol::error err = r;
                 VX_ERROR("Lua: failed to load {}: {}", sc.path, err.what());
                 sc.loaded = true; // don't retry on every frame
-                continue;
+                return;
             }
             // If the script returned a table, merge its callbacks into the
             // instance table so `on_update` is reachable.
@@ -177,7 +177,7 @@ void ScriptHost::update(float dt, Scene& scene) {
 
         sol::table inst = m_impl->lua[sc.instance_key];
         if (!inst.valid())
-            continue;
+            return;
         sol::object upd = inst["on_update"];
         if (upd.is<sol::protected_function>()) {
             sol::protected_function f = upd;
@@ -187,7 +187,7 @@ void ScriptHost::update(float dt, Scene& scene) {
                 VX_ERROR("Lua: on_update in {}: {}", sc.path, err.what());
             }
         }
-    }
+    });
 }
 
 } // namespace vaxelis

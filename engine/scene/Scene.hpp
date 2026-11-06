@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -11,8 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include <entt/entt.hpp>
-
+#include "engine/ecs/World.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/scene/Components.hpp"
 
@@ -20,41 +20,39 @@ namespace vaxelis {
 
 class SpriteBatch;
 
-/// Scene = entt::registry + an implicit root entity that holds the top-level
-/// nodes. Hierarchy edits go through the helpers below so parent/child stay in
+/// Scene = an archetype world plus an implicit root entity that holds the
+/// top-level nodes. Hierarchy edits go through the helpers below so parent/child stay in
 /// sync; touching the registry directly skips those invariants.
 class Scene {
   public:
     /// Creates an empty scene holding just the root entity.
     Scene();
 
-    /// Not copyable: entt::registry is move-only.
+    /// Not copyable: ecs::World is move-only.
     Scene(const Scene&) = delete;
     Scene& operator=(const Scene&) = delete;
 
     /// Movable, but only through these: the constructor installs Hierarchy
-    /// construct/destroy listeners bound to `this`, and those connections live
-    /// in the component pools, so they follow the registry. An implicit move
-    /// would leave them naming the scene they came from.
+    /// construct/destroy listeners bound to `this`, and a world carries its
+    /// subscriptions with it, so an implicit move would leave them naming the
+    /// scene they came from.
     ///
-    /// Both are implemented as swaps, mirroring entt::registry, so neither side
-    /// is ever left in the moved-from state entt declines to support. The
+    /// Both are implemented as swaps, so neither side is left hollow: the
+    /// runtime clears a scene with `m_scene = Scene{}` and keeps using it. The
     /// constructor is not noexcept: it default-constructs a scene (one root
-    /// entity) before trading contents with the source.
+    /// node) before trading contents with the source.
     Scene(Scene&& other);
     Scene& operator=(Scene&& other) noexcept;
 
     /// Exchanges contents with `other`, rebinding both scenes' listeners.
     void swap(Scene& other) noexcept;
 
-    /// Direct registry access; see the class note about hierarchy invariants.
-    ///
-    /// Being retired: it names the storage, so every use of it is a site the
-    /// archetype port has to rewrite by hand. New code goes through the typed
-    /// accessors below, which the port can redirect in one place.
-    entt::registry& registry() { return m_registry; }
-    /// Read-only registry access, for systems that only query. See registry().
-    const entt::registry& registry() const { return m_registry; }
+    /// Direct world access; see the class note about hierarchy invariants.
+    /// Prefer the typed accessors below. This is for what they do not cover,
+    /// such as subscribing to a component signal.
+    ecs::World& world() { return m_world; }
+    /// Read-only world access, for systems that only query. See world().
+    const ecs::World& world() const { return m_world; }
     /// The implicit root entity that parents all top-level nodes.
     NodeId root() const { return m_root; }
 
@@ -91,59 +89,64 @@ class Scene {
     // The typed face over the storage. Written so call sites name Scene rather
     // than the registry: the archetype port changes what is underneath these,
     // and anything that went through registry() directly has to be rewritten
-    // by hand. Semantics match the entt calls they wrap.
+    // by hand. Semantics match the storage calls they wrap.
 
     /// True while `e` refers to a live node.
-    bool valid(NodeId e) const { return e != kNoNode && m_registry.valid(e); }
+    bool valid(NodeId e) const { return m_world.alive(e); }
 
     /// True when `e` carries a `T`.
-    template <class T> bool has(NodeId e) const {
-        return valid(e) && m_registry.try_get<T>(e) != nullptr;
-    }
+    template <class T> bool has(NodeId e) const { return m_world.has<T>(e); }
 
     /// Gives `e` a `T`, built from `args`, replacing any it already had.
+    ///
+    /// A component the node does not carry yet migrates its row, so this is a
+    /// structural change. Build a node through create_node rather than adding
+    /// its components one at a time.
     template <class T, class... Args> T& add(NodeId e, Args&&... args) {
-        return m_registry.emplace_or_replace<T>(e, std::forward<Args>(args)...);
+        T* slot = m_world.add<T>(e, T{std::forward<Args>(args)...});
+        assert(slot != nullptr && "Scene::add on a dead node");
+        return *slot;
     }
 
     /// `e`'s `T`. Asserts in the storage if it has none; use try_get() when
     /// that is in question.
-    template <class T> T& get(NodeId e) { return m_registry.get<T>(e); }
+    template <class T> T& get(NodeId e) {
+        T* slot = m_world.try_get<T>(e);
+        assert(slot != nullptr && "Scene::get on a node without that component");
+        return *slot;
+    }
     /// Read-only overload of get().
-    template <class T> const T& get(NodeId e) const { return m_registry.get<T>(e); }
+    template <class T> const T& get(NodeId e) const {
+        const T* slot = m_world.try_get<T>(e);
+        assert(slot != nullptr && "Scene::get on a node without that component");
+        return *slot;
+    }
 
     /// `e`'s `T`, or nullptr when it has none or the handle is stale.
-    template <class T> T* try_get(NodeId e) {
-        return valid(e) ? m_registry.try_get<T>(e) : nullptr;
-    }
+    template <class T> T* try_get(NodeId e) { return m_world.try_get<T>(e); }
     /// Read-only overload of try_get().
-    template <class T> const T* try_get(NodeId e) const {
-        return valid(e) ? m_registry.try_get<T>(e) : nullptr;
-    }
+    template <class T> const T* try_get(NodeId e) const { return m_world.try_get<T>(e); }
 
     /// Takes `T` away from `e`. A no-op when it has none.
-    template <class T> void remove(NodeId e) {
-        if (valid(e))
-            m_registry.remove<T>(e);
-    }
+    template <class T> void remove(NodeId e) { m_world.remove<T>(e); }
 
     /// Calls `fn(T&...)` for every node carrying all of `Ts`. Query types may
     /// be const-qualified to ask for read-only access.
     template <class... Ts, class Fn> void each(Fn&& fn) {
-        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+        m_world.each<Ts...>(std::forward<Fn>(fn));
     }
     /// Read-only overload of each().
     template <class... Ts, class Fn> void each(Fn&& fn) const {
-        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+        m_world.each<Ts...>(std::forward<Fn>(fn));
     }
 
     /// Like each(), but `fn` takes the node handle first.
     template <class... Ts, class Fn> void each_node(Fn&& fn) {
-        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+        m_world.each_entity<Ts...>(std::forward<Fn>(fn));
     }
     /// Read-only overload of each_node().
     template <class... Ts, class Fn> void each_node(Fn&& fn) const {
-        m_registry.view<Ts...>().each(std::forward<Fn>(fn));
+        m_world.each_entity<Ts...>(std::forward<Fn>(fn));
     }
 
     /// Depth-first traversal in child order. Visitor is called for each entity
@@ -183,27 +186,27 @@ class Scene {
 
     /// Subscribes mark_order_dirty to Hierarchy construction and destruction,
     /// so the traversal order is invalidated however a node appears or dies --
-    /// including a registry.destroy() that bypasses destroy_node.
+    /// including a world().destroy() that bypasses destroy_node.
     void connect_listeners();
 
-    /// Repoints listeners that arrived with a swapped registry from `previous`
+    /// Repoints listeners that arrived with a swapped world from `previous`
     /// onto this scene.
     void rebind_listeners(Scene& previous);
 
-    /// Listener signature required by entt; both signals land here.
-    void mark_order_dirty(entt::registry& reg, NodeId e);
+    /// Listener signature required by ecs::Sink; both signals land here.
+    void mark_order_dirty(ecs::World& world, NodeId e);
 
     /// Recomputes m_order from the hierarchy. Called lazily from
     /// update_world_transforms when a structural edit has invalidated it.
     void rebuild_order();
 
-    entt::registry m_registry;
+    ecs::World m_world;
     NodeId m_root{kNoNode};
 
     std::vector<OrderEntry> m_order;
     /// World matrix per m_order slot, so a child reads its parent's result by
     /// index instead of looking the component back up.
-    std::vector<mat4> m_world;
+    std::vector<mat4> m_world_matrices;
     bool m_order_dirty{true};
 
     /// Sort scratch for render_sprites, kept between frames so a steady scene

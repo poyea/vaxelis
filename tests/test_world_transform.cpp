@@ -88,7 +88,7 @@ TEST(WorldTransform, RegistryDestroyInvalidatesTheCachedOrder) {
 
     // Bypasses destroy_node, so only the Hierarchy destroy signal can save the
     // cached order from naming a dead entity.
-    s.registry().destroy(b);
+    s.world().destroy(b);
     s.update_world_transforms();
 
     EXPECT_FALSE(s.valid(b));

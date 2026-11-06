@@ -16,11 +16,9 @@ Scene::Scene() {
     init_root();
 }
 
-// Both operations are swaps, because entt::registry's own move assignment is a
-// swap and its move constructor rebinds only the destination: a scene whose
-// registry was moved out of is not something entt promises is usable. Trading
-// contents instead leaves both ends valid, and the source -- a temporary, in
-// the `m_scene = Scene{}` idiom -- takes the old scene to the grave with it.
+// Both operations are swaps. Trading contents leaves both ends valid, and the
+// source -- a temporary, in the `m_scene = Scene{}` idiom -- takes the old
+// scene to the grave with it.
 Scene::Scene(Scene&& other) : Scene() {
     swap(other);
 }
@@ -33,88 +31,93 @@ Scene& Scene::operator=(Scene&& other) noexcept {
 
 void Scene::swap(Scene& other) noexcept {
     using std::swap;
-    m_registry.swap(other.m_registry);
+    // std::swap over the worlds, which are movable but have no swap of their
+    // own; three moves, all noexcept.
+    swap(m_world, other.m_world);
     swap(m_root, other.m_root);
     swap(m_order, other.m_order);
-    swap(m_world, other.m_world);
+    swap(m_world_matrices, other.m_world_matrices);
     swap(m_order_dirty, other.m_order_dirty);
     swap(m_sprite_items, other.m_sprite_items);
-    // The connections live in the component pools, so they travelled with the
-    // registries: each side's listeners now name the other scene.
+    // Subscriptions travelled with the worlds, so each side's listeners now
+    // name the other scene.
     rebind_listeners(other);
     other.rebind_listeners(*this);
 }
 
 void Scene::init_root() {
-    // Listeners first: emplacing the root's Hierarchy below fires one.
+    // Listeners first: creating the root below fires one.
     connect_listeners();
-    m_root = m_registry.create();
-    m_registry.emplace<Name>(m_root, "Root");
-    m_registry.emplace<Hierarchy>(m_root);
-    m_registry.emplace<Transform2D>(m_root);
+    // One variadic create, not a create plus three adds: each add would migrate
+    // the row to a new archetype, and the benchmark puts that at 6.28x entt
+    // against 2.81x for this.
+    m_root = m_world.create(Name{"Root"}, Hierarchy{}, Transform2D{}, WorldTransform2D{});
 }
 
 void Scene::connect_listeners() {
-    m_registry.on_construct<Hierarchy>().connect<&Scene::mark_order_dirty>(*this);
-    m_registry.on_destroy<Hierarchy>().connect<&Scene::mark_order_dirty>(*this);
+    m_world.on_construct<Hierarchy>().connect<&Scene::mark_order_dirty>(*this);
+    m_world.on_destroy<Hierarchy>().connect<&Scene::mark_order_dirty>(*this);
 }
 
 void Scene::rebind_listeners(Scene& previous) {
-    // The connections came across with the registry still naming `previous`.
-    m_registry.on_construct<Hierarchy>().disconnect(&previous);
-    m_registry.on_destroy<Hierarchy>().disconnect(&previous);
+    // The connections came across with the world still naming `previous`.
+    m_world.on_construct<Hierarchy>().disconnect(&previous);
+    m_world.on_destroy<Hierarchy>().disconnect(&previous);
     connect_listeners();
 }
 
-void Scene::mark_order_dirty(entt::registry&, NodeId) {
+void Scene::mark_order_dirty(ecs::World&, NodeId) {
     m_order_dirty = true;
 }
 
 NodeId Scene::create_node(std::string name, NodeId parent, Uuid uuid) {
     if (parent == kNoNode)
         parent = m_root;
-    auto e = m_registry.create();
-    m_registry.emplace<Id>(e, Id{uuid.valid() ? uuid : generate_uuid()});
-    m_registry.emplace<Name>(e, Name{std::move(name)});
-    m_registry.emplace<Hierarchy>(e, Hierarchy{parent, {}});
-    m_registry.emplace<Transform2D>(e);
-    // No explicit invalidation here or in destroy_node: emplacing and releasing
-    // Hierarchy is what the listeners watch.
-    m_registry.get<Hierarchy>(parent).children.push_back(e);
+    // Every component in one create: see init_root on why this is not four
+    // add() calls. WorldTransform2D is in the set so the per-frame sweep only
+    // ever overwrites it, never migrates a row to make room for it.
+    const NodeId e =
+        m_world.create(Id{uuid.valid() ? uuid : generate_uuid()}, Name{std::move(name)},
+                       Hierarchy{parent, {}}, Transform2D{}, WorldTransform2D{});
+    // No explicit invalidation here or in destroy_node: a Hierarchy coming into
+    // or going out of existence is what the listeners watch.
+    get<Hierarchy>(parent).children.push_back(e);
     return e;
 }
 
 NodeId Scene::find_by_uuid(const Uuid& uuid) const {
     if (!uuid.valid())
         return kNoNode;
-    for (auto e : m_registry.view<const Id>())
-        if (m_registry.get<const Id>(e).uuid == uuid)
-            return e;
-    return kNoNode;
+    // No early exit out of a query walk, so carry the answer out instead.
+    NodeId found = kNoNode;
+    each_node<const Id>([&](NodeId e, const Id& id) {
+        if (found == kNoNode && id.uuid == uuid)
+            found = e;
+    });
+    return found;
 }
 
 void Scene::detach_from_parent(NodeId e) {
-    auto* h = m_registry.try_get<Hierarchy>(e);
-    if (!h || h->parent == kNoNode)
+    auto* h = try_get<Hierarchy>(e);
+    if (h == nullptr || h->parent == kNoNode)
         return;
-    auto& parent_h = m_registry.get<Hierarchy>(h->parent);
-    std::erase(parent_h.children, e);
+    if (auto* parent_h = try_get<Hierarchy>(h->parent))
+        std::erase(parent_h->children, e);
     h->parent = kNoNode;
 }
 
 void Scene::destroy_recursive(NodeId e) {
-    auto* h = m_registry.try_get<Hierarchy>(e);
-    if (h) {
+    if (auto* h = try_get<Hierarchy>(e)) {
         // Copy because destroy invalidates the child list.
         auto kids = h->children;
         for (auto c : kids)
             destroy_recursive(c);
     }
-    m_registry.destroy(e);
+    m_world.destroy(e);
 }
 
 void Scene::destroy_node(NodeId e) {
-    if (e == kNoNode || e == m_root || !m_registry.valid(e))
+    if (e == m_root || !valid(e))
         return;
     detach_from_parent(e);
     destroy_recursive(e);
@@ -132,26 +135,22 @@ void Scene::set_parent(NodeId e, NodeId new_parent) {
     for (auto cur = new_parent; cur != kNoNode;) {
         if (cur == e)
             return;
-        auto* h = m_registry.try_get<Hierarchy>(cur);
-        cur = h ? h->parent : kNoNode;
+        auto* h = try_get<Hierarchy>(cur);
+        cur = h != nullptr ? h->parent : kNoNode;
     }
 
     detach_from_parent(e);
-    auto& eh = m_registry.get<Hierarchy>(e);
-    eh.parent = new_parent;
-    m_registry.get<Hierarchy>(new_parent).children.push_back(e);
+    get<Hierarchy>(e).parent = new_parent;
+    get<Hierarchy>(new_parent).children.push_back(e);
     // Reparenting mutates Hierarchy in place, so no signal fires for it.
     m_order_dirty = true;
 }
 
 mat4 Scene::world_matrix(NodeId e) const {
-    if (e == kNoNode || !m_registry.valid(e))
+    if (!valid(e))
         return mat4(1.0f);
-    // Prefer cached value if update_world_transforms was called this frame.
-    if (const auto* w = m_registry.try_get<WorldTransform2D>(e))
-        return w->matrix;
-    const auto* t = m_registry.try_get<Transform2D>(e);
-    const auto* h = m_registry.try_get<Hierarchy>(e);
+    const auto* t = try_get<Transform2D>(e);
+    const auto* h = try_get<Hierarchy>(e);
     mat4 m = t ? t->local_matrix() : mat4(1.0f);
     if (h && h->parent != kNoNode)
         m = world_matrix(h->parent) * m;
@@ -167,19 +166,19 @@ void Scene::rebuild_order() {
     while (!stack.empty()) {
         const auto [e, parent] = stack.back();
         stack.pop_back();
-        // A child list can still name an entity destroyed straight through the
-        // registry, which never got the chance to unlink itself. Skipping it
-        // here is what keeps the sweep free of liveness checks.
-        if (!m_registry.valid(e))
+        // A child list can still name a node destroyed straight through the
+        // world, which never got the chance to unlink itself. Skipping it here
+        // is what keeps the sweep free of liveness checks.
+        if (!valid(e))
             continue;
         const size_t index = m_order.size();
         m_order.push_back(OrderEntry{e, parent});
-        if (const auto* h = m_registry.try_get<Hierarchy>(e)) {
+        if (const auto* h = try_get<Hierarchy>(e)) {
             for (auto c : std::ranges::reverse_view(h->children))
                 stack.emplace_back(c, index);
         }
     }
-    m_world.assign(m_order.size(), mat4(1.0f));
+    m_world_matrices.assign(m_order.size(), mat4(1.0f));
     m_order_dirty = false;
 }
 
@@ -192,20 +191,27 @@ void Scene::update_world_transforms() {
     static const mat4 kIdentity(1.0f);
     for (size_t i = 0; i < m_order.size(); ++i) {
         const OrderEntry& entry = m_order[i];
-        const mat4& parent_world = entry.parent == kNoParent ? kIdentity : m_world[entry.parent];
+        const mat4& parent_world =
+            entry.parent == kNoParent ? kIdentity : m_world_matrices[entry.parent];
         mat4 world = parent_world;
-        if (const auto* t = m_registry.try_get<Transform2D>(entry.entity))
+        if (const auto* t = try_get<Transform2D>(entry.entity))
             world = parent_world * t->local_matrix();
-        m_world[i] = world;
-        m_registry.emplace_or_replace<WorldTransform2D>(entry.entity, world);
+        m_world_matrices[i] = world;
+        // create_node gives every node a WorldTransform2D, so this is an
+        // overwrite. A node built straight through the world may lack one, and
+        // only that case pays a migration -- once.
+        if (auto* cached = try_get<WorldTransform2D>(entry.entity))
+            cached->matrix = world;
+        else
+            add<WorldTransform2D>(entry.entity, world);
     }
 }
 
 void Scene::for_each(const std::function<void(NodeId)>& visit) const {
     auto walk = [&](auto& self, NodeId e) -> void {
         visit(e);
-        const auto* h = m_registry.try_get<Hierarchy>(e);
-        if (!h)
+        const auto* h = try_get<Hierarchy>(e);
+        if (h == nullptr)
             return;
         for (auto c : h->children)
             self(self, c);
@@ -222,21 +228,19 @@ void Scene::render_sprites(SpriteBatch& batch) {
     // member: clear() keeps the capacity, so only a scene that grows past its
     // previous sprite count allocates.
     m_sprite_items.clear();
-    auto view = m_registry.view<const SpriteComponent>();
-    for (auto e : view) {
-        const auto& s = view.get<const SpriteComponent>(e);
+    each_node<const SpriteComponent>([this](NodeId e, const SpriteComponent& s) {
         if (!s.visible || !s.texture.valid())
-            continue;
+            return;
         m_sprite_items.push_back(SpriteDrawItem{e, s.z_order, s.texture.id});
-    }
+    });
     std::ranges::stable_sort(m_sprite_items, {}, [](const SpriteDrawItem& i) {
         return std::pair{i.z_order, i.texture};
     });
     for (const auto& it : m_sprite_items) {
-        const auto& s = m_registry.get<const SpriteComponent>(it.entity);
+        const auto& s = get<SpriteComponent>(it.entity);
         // The whole world matrix, not just its translation column: a sprite
         // inherits the rotation and scale of every ancestor as well as its own.
-        const auto& w = m_registry.get<WorldTransform2D>(it.entity).matrix;
+        const auto& w = get<WorldTransform2D>(it.entity).matrix;
         batch.draw(s.texture, w, s.size, s.uv_rect, s.color);
     }
 }

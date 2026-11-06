@@ -2,13 +2,19 @@
 // Copyright (c) 2026 John Law
 
 /// @file
-/// Times four passes over a scene of adjustable size and depth: a flat entt
-/// sweep, the hierarchy DFS, sprite submission, and the same flat sweep over
-/// archetype columns.
+/// Times four passes over a scene of adjustable size and depth: a flat sweep
+/// over the scene, the hierarchy DFS, sprite submission, and the same flat
+/// sweep over a bare mirror world.
 ///
-/// `dfs/flat` is what the scene graph costs. `arch/flat` is archetype storage
-/// against entt's on identical work -- but the archetype world mirrors only the
-/// entity count and Transform2D, so read it as an upper bound.
+/// `dfs/flat` is what the scene graph costs over a flat sweep of the same
+/// nodes.
+///
+/// `arch/flat` no longer compares two storage engines: since the port, the
+/// scene *is* an archetype world, so this measures a scene node (Id, Name,
+/// Hierarchy, Transform2D, WorldTransform2D, often SpriteComponent) against a
+/// mirror holding Transform2D alone. It is the cost of archetype width, not of
+/// archetype versus sparse set. For that comparison, which still runs entt
+/// directly, see benchmarks/ecs_bench.
 ///
 /// render_sprites() refreshes world transforms itself, so subtract `transform`
 /// from `render` to get the gather/sort/submit cost alone.
@@ -23,7 +29,6 @@
 #include <vector>
 
 #include <SDL3/SDL_scancode.h>
-#include <entt/entt.hpp>
 #include <imgui.h>
 
 #include "engine/assets/AssetCache.hpp"
@@ -99,9 +104,7 @@ class Stress final : public vaxelis::Application {
         if (input().pressed("rebuild"))
             rebuild();
 
-        // Phase 1: flat sweep over the sparse set. view::each is entt's fast
-        // path -- iterating the view and calling get() per entity would add a
-        // sparse->dense lookup each step and quietly slander it.
+        // Phase 1: flat sweep over the scene's own Transform2D column.
         const auto t_anim = SteadyClock::now();
         m_scene.each<vaxelis::Transform2D>([dt](vaxelis::Transform2D& tr) { tr.rotation += dt; });
         m_anim.push(ms_since(t_anim));
@@ -155,7 +158,7 @@ class Stress final : public vaxelis::Application {
         ImGui::Separator();
         ImGui::Text("dfs/flat   %.2fx     scene graph vs sparse-set sweep",
                     static_cast<double>(ratio(m_transform, m_anim)));
-        ImGui::Text("arch/flat  %.2fx     archetype vs sparse set (<1 wins)",
+        ImGui::Text("arch/flat  %.2fx     narrow mirror vs scene width (<1 wins)",
                     static_cast<double>(ratio(m_archetype, m_anim)));
         ImGui::Separator();
         ImGui::Text("quads      %u in %u draw calls", m_batch.quads(), m_batch.draw_calls());
@@ -227,8 +230,8 @@ class Stress final : public vaxelis::Application {
 
         m_build_ms = ms_since(t0);
 
-        // Mirror the node count into an archetype world. One add() per entity
-        // means one migration each, empty archetype -> {Transform2D}.
+        // Mirror the node count into a world holding Transform2D only, so
+        // phase 3 sweeps the narrowest archetype there is.
         const auto t_ecs = SteadyClock::now();
         m_ecs = vaxelis::ecs::World{};
         for (int i = 0; i < m_nodes; ++i)

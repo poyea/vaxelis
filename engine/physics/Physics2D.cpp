@@ -54,30 +54,36 @@ void Physics2D::shutdown() {
 }
 
 void Physics2D::register_with(Scene& scene) {
-    auto& reg = scene.registry();
-    reg.on_destroy<RigidBody2D>().connect<&Physics2D::on_rb_destroyed>(*this);
-    reg.on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
+    auto& world = scene.world();
+    world.on_destroy<RigidBody2D>().connect<&Physics2D::on_rb_destroyed>(*this);
+    world.on_destroy<BoxCollider2D>().connect<&Physics2D::on_col_destroyed>(*this);
 }
 
-void Physics2D::on_rb_destroyed(entt::registry& reg, NodeId e) {
+void Physics2D::on_rb_destroyed(ecs::World& scene_world, NodeId e) {
     if (!b2World_IsValid(m_world))
         return;
-    auto& rb = reg.get<RigidBody2D>(e);
+    RigidBody2D* rb_slot = scene_world.try_get<RigidBody2D>(e);
+    if (rb_slot == nullptr)
+        return;
+    RigidBody2D& rb = *rb_slot;
     if (B2_IS_NULL(rb.body))
         return;
     // Destroying the body also releases any attached shapes (Box2D v3
     // semantics), so we mark the collider's shape null to keep the C++ state
     // consistent before the BoxCollider2D destroy-signal fires.
-    if (auto* col = reg.try_get<BoxCollider2D>(e))
+    if (auto* col = scene_world.try_get<BoxCollider2D>(e))
         col->shape = b2_nullShapeId;
     b2DestroyBody(rb.body);
     rb.body = b2_nullBodyId;
 }
 
-void Physics2D::on_col_destroyed(entt::registry& reg, NodeId e) {
+void Physics2D::on_col_destroyed(ecs::World& scene_world, NodeId e) {
     if (!b2World_IsValid(m_world))
         return;
-    auto& col = reg.get<BoxCollider2D>(e);
+    BoxCollider2D* col_slot = scene_world.try_get<BoxCollider2D>(e);
+    if (col_slot == nullptr)
+        return;
+    BoxCollider2D& col = *col_slot;
     if (B2_IS_NULL(col.shape))
         return;
     b2DestroyShape(col.shape, /*updateBodyMass=*/true);

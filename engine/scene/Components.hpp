@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include <entt/entt.hpp>
-
 #include "engine/core/Uuid.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/rhi/Rhi.hpp"
@@ -17,7 +15,7 @@ namespace vaxelis {
 
 /// Stable identity. Assigned once at node creation and preserved across
 /// save/load, so references survive reordering and stay unique across merges.
-/// (entt handles, by contrast, are reused and per-registry.)
+/// (Node handles, by contrast, are reused and per-world.)
 struct Id {
     Uuid uuid;
 };

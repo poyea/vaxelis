@@ -6,8 +6,7 @@
 #include <cstdint>
 
 #include <box2d/box2d.h>
-#include <entt/entt.hpp>
-
+#include "engine/ecs/World.hpp"
 #include "engine/math/Math.hpp"
 #include "engine/scene/NodeId.hpp"
 
@@ -35,7 +34,7 @@ class Physics2D {
     /// True while a valid world exists.
     bool ready() const { return b2World_IsValid(m_world); }
 
-    /// Hooks entt destroy-signals so that removing RigidBody2D / BoxCollider2D
+    /// Hooks world destroy-signals so that removing RigidBody2D / BoxCollider2D
     /// (or destroying the owning entity) releases the underlying Box2D handles.
     /// Call once per Scene, after `init()`. Connections detach when the
     /// registry is destroyed.
@@ -63,8 +62,8 @@ class Physics2D {
     b2WorldId world() const { return m_world; }
 
   private:
-    void on_rb_destroyed(entt::registry& reg, NodeId e);
-    void on_col_destroyed(entt::registry& reg, NodeId e);
+    void on_rb_destroyed(ecs::World& scene_world, NodeId e);
+    void on_col_destroyed(ecs::World& scene_world, NodeId e);
 
     b2WorldId m_world{b2_nullWorldId};
     Config m_cfg{};

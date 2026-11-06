@@ -9,40 +9,40 @@
 
 #include <cstdint>
 
-#include <entt/entt.hpp>
+#include "engine/ecs/Entity.hpp"
 
 namespace vaxelis {
 
-/// Handle for one scene node.
+/// Handle for one scene node: an entity in the scene's archetype world.
 ///
-/// An alias for entt's entity while the scene is stored in an entt::registry.
-/// The archetype port swaps it for `ecs::Entity`, so code that spells this name
-/// instead of `entt::entity` needs no edit when that happens. Prefer it, and
-/// prefer the typed accessors on Scene over reaching for registry().
-using NodeId = entt::entity;
+/// An index plus the generation its slot carried when the handle was made, so a
+/// handle to a destroyed node reads as dead rather than aliasing whatever node
+/// reused the slot. Not an integer: go through node_key() for a key.
+using NodeId = ecs::Entity;
 
-/// The handle that refers to no node. Use in place of `entt::null`.
-inline constexpr NodeId kNoNode = static_cast<NodeId>(entt::null);
+/// The handle that refers to no node.
+inline constexpr NodeId kNoNode = ecs::kNoEntity;
 
 /// A node handle flattened to one integer, for the places that need a key
 /// rather than a handle: ImGui widget ids, Lua, log lines.
 ///
-/// 64 bits because the archetype handle is an index plus a generation, and
-/// dropping the generation would make a recycled slot indistinguishable from
-/// the entity that used to hold it. Opaque: pass it around, compare it, give it
-/// back to node_from_key(), but do not do arithmetic on it.
+/// 64 bits because the handle is an index plus a generation, and dropping the
+/// generation would make a recycled slot indistinguishable from the node that
+/// used to hold it. Opaque: pass it around, compare it, give it back to
+/// node_from_key(), but do not do arithmetic on it.
 using NodeKey = uint64_t;
 
 /// Flattens `e`. Round-trips through node_from_key().
 constexpr NodeKey node_key(NodeId e) {
-    return static_cast<NodeKey>(static_cast<uint32_t>(e));
+    return (static_cast<NodeKey>(e.generation) << 32) | static_cast<NodeKey>(e.index);
 }
 
 /// Rebuilds the handle `node_key()` flattened. A key from a different world, or
 /// one that has been tampered with, yields a handle that reads as dead rather
 /// than one that aliases a live node.
 constexpr NodeId node_from_key(NodeKey key) {
-    return static_cast<NodeId>(static_cast<uint32_t>(key));
+    return NodeId{.index = static_cast<uint32_t>(key & 0xffffffffU),
+                  .generation = static_cast<uint32_t>(key >> 32)};
 }
 
 } // namespace vaxelis
