@@ -30,6 +30,17 @@ void macro_timed_function() {
     VX_PROFILE_FUNCTION();
 }
 
+void inner_scope() {
+    const ScopeTimer inner{"inner"};
+}
+
+/// Holds "outer" open across the whole of inner_scope(), so the recorded spans
+/// must nest.
+void nested_scopes() {
+    const ScopeTimer outer{"outer"};
+    inner_scope();
+}
+
 size_t count_occurrences(const std::string& haystack, const std::string& needle) {
     size_t n = 0;
     for (size_t at = haystack.find(needle); at != std::string::npos;
@@ -57,12 +68,7 @@ TEST_F(ProfilerFixture, ScopeTimerRecordsOneEventPerScope) {
     Profiler& p = Profiler::instance();
     p.begin_session("test");
 
-    {
-        const ScopeTimer outer{"outer"};
-        {
-            const ScopeTimer inner{"inner"};
-        }
-    }
+    nested_scopes();
 
     ASSERT_EQ(p.events().size(), 2u);
     // Inner closes first, so it is recorded first; the outer must enclose it.
