@@ -51,12 +51,22 @@ void Physics2D::shutdown() {
         b2DestroyWorld(m_world);
         m_world = b2_nullWorldId;
     }
+    // The world owned every body and shape it handed out, so the ids left in
+    // the components are now dangling. Clearing them matters for init() on the
+    // same scene: sync_to_scene treats a non-null id as a live body, so it
+    // would create nothing and then call b2Body_GetPosition on a dead handle.
+    if (m_scene_world != nullptr) {
+        m_scene_world->each<RigidBody2D>([](RigidBody2D& rb) { rb.body = b2_nullBodyId; });
+        m_scene_world->each<BoxCollider2D>([](BoxCollider2D& col) { col.shape = b2_nullShapeId; });
+    }
 }
 
 Physics2D::~Physics2D() {
-    // Order matters: the listeners call into this object, so they go first.
-    unregister();
+    // shutdown() clears the component handles, which needs the subscription's
+    // world pointer, so it runs before unregister() drops it. Neither fires a
+    // destroy signal, so the listeners cannot be reached in between.
     shutdown();
+    unregister();
 }
 
 void Physics2D::register_with(Scene& scene) {
