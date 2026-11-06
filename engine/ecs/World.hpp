@@ -64,6 +64,11 @@ class World {
     /// whole entity with it. Published *before* the data goes, so a listener
     /// can still read the component it is being told about.
     ///
+    /// destroy() announces every component the entity ends up carrying, so a
+    /// component a listener adds on the way out is announced too rather than
+    /// being dropped silently. Each is announced once; the order is the
+    /// archetype's, which is to say unspecified.
+    ///
     /// Not published by ~World(), matching entt: teardown is not deletion, and
     /// a subsystem whose own destructor is already running does not want the
     /// call. Release what an entity owns while the world is still alive.

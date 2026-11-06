@@ -169,21 +169,35 @@ void World::destroy(Entity e) {
     if (!alive(e))
         return;
 
-    // Snapshot the shape before telling anyone: a listener is allowed to add or
-    // remove components, which migrates the row and would invalidate the
-    // table's own id list halfway through the walk.
-    std::array<ComponentId, kMaxComponents> ids{};
-    size_t count = 0;
-    for (const ComponentId id : m_records[e.index].table->archetype.component_ids())
-        ids[count++] = id;
-
-    for (size_t i = 0; i < count; ++i) {
-        // A listener may have destroyed the entity itself, or already taken
-        // this component off it.
+    // Publish for every component the entity carries, re-reading its shape each
+    // time rather than working from a snapshot. A listener may add a component
+    // (its destruction has to be announced too), remove one (nothing to
+    // announce), or destroy the entity outright, and a snapshot taken up front
+    // would miss the first case and drop whatever it owned without a word.
+    //
+    // Terminates because a component is published at most once: the mask only
+    // ever gains bits, and each pass either publishes an unpublished component
+    // or finds none left.
+    Signature published;
+    for (;;) {
         if (!alive(e))
             return;
-        if (m_records[e.index].table->archetype.has(ids[i]))
-            publish(m_on_destroy, ids[i], e);
+        const Record* rec = find(e);
+        if (rec == nullptr)
+            return;
+
+        ComponentId next = kInvalidComponent;
+        for (const ComponentId id : rec->table->archetype.component_ids()) {
+            if (!published.test(id)) {
+                next = id;
+                break;
+            }
+        }
+        if (next == kInvalidComponent)
+            break;
+
+        published.set(next);
+        publish(m_on_destroy, next, e);
     }
     if (!alive(e))
         return;
