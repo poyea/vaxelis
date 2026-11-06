@@ -144,8 +144,7 @@ void ScriptHost::update(float dt, Scene& scene) {
             }
             // Create the per-instance subtable, expose entity_id, then run the
             // script with that table as its `self`/environment-lite.
-            m_impl->lua[sc.instance_key] =
-                m_impl->lua.create_table_with("entity_id", node_key(e));
+            m_impl->lua[sc.instance_key] = m_impl->lua.create_table_with("entity_id", node_key(e));
             m_impl->instances.insert(sc.instance_key);
             sol::protected_function_result r =
                 m_impl->lua.safe_script_file(sc.path, sol::script_pass_on_error);
