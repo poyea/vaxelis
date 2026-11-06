@@ -25,7 +25,6 @@ using NodeId = entt::entity;
 /// The handle that refers to no node. Use in place of `entt::null`.
 inline constexpr NodeId kNoNode = static_cast<NodeId>(entt::null);
 
-
 /// Stable identity. Assigned once at node creation and preserved across
 /// save/load, so references survive reordering and stay unique across merges.
 /// (entt handles, by contrast, are reused and per-registry.)
