@@ -313,10 +313,9 @@ class Platformer final : public vaxelis::Application {
                     auto e = m_scene.create_node("Tile");
                     auto& tr = m_scene.get<vaxelis::Transform2D>(e);
                     tr.position = {(x + 0.5f) * m_map.tile_w, (y + 0.5f) * m_map.tile_h};
-                    m_scene.add<vaxelis::RigidBody2D>(e).type =
-                        vaxelis::BodyType::Static;
-                    m_scene.add<vaxelis::BoxCollider2D>(e).half_extents = {
-                        m_map.tile_w * 0.5f, m_map.tile_h * 0.5f};
+                    m_scene.add<vaxelis::RigidBody2D>(e).type = vaxelis::BodyType::Static;
+                    auto& col = m_scene.add<vaxelis::BoxCollider2D>(e);
+                    col.half_extents = {m_map.tile_w * 0.5f, m_map.tile_h * 0.5f};
                 }
             }
         }
@@ -334,8 +333,7 @@ class Platformer final : public vaxelis::Application {
                 } else if (obj.type == "goal") {
                     m_goal = {obj.pos, obj.pos + obj.size};
                     auto e = m_scene.create_node("Goal");
-                    m_scene.get<vaxelis::Transform2D>(e).position =
-                        (obj.pos + obj.size) * 0.5f;
+                    m_scene.get<vaxelis::Transform2D>(e).position = (obj.pos + obj.size) * 0.5f;
                     auto& s = m_scene.add<vaxelis::SpriteComponent>(e);
                     s.texture_key = "goal";
                     s.size = obj.size;
