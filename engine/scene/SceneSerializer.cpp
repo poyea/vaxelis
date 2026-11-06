@@ -72,7 +72,9 @@ std::string to_json(const Scene& s, int indent) {
     return out.dump(indent);
 }
 
-bool from_json(Scene& s, std::string_view jtext) {
+/// The body of from_json, minus the exception guard around it. Internal: it is
+/// not part of the header's API.
+static bool from_json_unguarded(Scene& s, std::string_view jtext) {
     json j;
     try {
         j = json::parse(jtext);
@@ -115,6 +117,15 @@ bool from_json(Scene& s, std::string_view jtext) {
             continue;
         // Adopt the stored uuid unless it is malformed (legacy integer ids),
         // null, or already taken; create_node mints a fresh one for {}.
+        // Two nodes sharing an id cannot both own the token. Whichever won
+        // would collect the other's parent, transform and sprite in pass two
+        // while the loser kept only its name, and the loser's children would
+        // reparent onto the winner. Rejecting the repeat loses one node from a
+        // malformed file instead of silently merging two.
+        if (by_token.contains(token)) {
+            VX_WARN("Scene load: duplicate node id '{}'; ignoring the later node", token);
+            continue;
+        }
         Uuid uuid = node["id"].is_string() ? uuid_from_string(token) : Uuid{};
         if (uuid.valid() && !used.insert(uuid).second)
             uuid = {}; // collision: let create_node remint
@@ -166,6 +177,20 @@ bool from_json(Scene& s, std::string_view jtext) {
         }
     }
     return true;
+}
+
+bool from_json(Scene& s, std::string_view jtext) {
+    // nlohmann throws on a field of the wrong type -- a string where a number
+    // belongs -- and letting that escape made a function returning bool report
+    // failure by unwinding instead. Nodes created before the throw stay in the
+    // scene, since from_json appends by design; a caller wanting all-or-nothing
+    // loads into a fresh Scene and discards it on false.
+    try {
+        return from_json_unguarded(s, jtext);
+    } catch (const std::exception& ex) {
+        VX_ERROR("Scene load: malformed node data: {}", ex.what());
+        return false;
+    }
 }
 
 bool save_file(const Scene& s, std::string_view path) {
